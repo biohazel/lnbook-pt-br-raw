@@ -1,0 +1,521 @@
+[appendix]
+[[bitcoin_fundamentals_review]]
+== Revisão dos Fundamentos do Bitcoin
+
+((("Bitcoin (system)","fundamentals", id="ix_appendix-bitcoin-fundamentals-review-asciidoc0", range="startofrange")))A Lightning Network é capaz de operar em várias blockchains, mas está principalmente ancorada no Bitcoin. Para entender a Lightning Network, é necessário ter um entendimento fundamental do Bitcoin e de seus blocos de construção.
+
+Existem muitos bons recursos que você pode usar para aprender mais sobre Bitcoin, incluindo o livro _Mastering Bitcoin_, 2nd Edition, by Andreas M. Antonopoulos, que você pode encontrar no GitHub em https://github.com/bitcoinbook/bitcoinbook[an licença open source]. No entanto, você não precisa ler um outro livro inteiro para estar pronto para este!
+
+Neste capítulo, reunimos os conceitos mais importantes que você precisa saber sobre o Bitcoin e os explicamos no contexto da Lightning Network. Dessa forma, você pode aprender exatamente o que precisa saber para compreender a Lightning Network sem distrações.
+
+Este capítulo cobre vários conceitos importantes do Bitcoin, incluindo:
+
+* Chaves e assinaturas digitais
+* Funções Hash
+* Transações de Bitcoin e sua estrutura
+* Encadeamento de transações Bitcoin
+* Outpoints de transação do Bitcoin
+* Bitcoin Script: locking e unlocking scripts
+* Scripts de bloqueio (locking) básicos
+* Scripts de bloqueio complexos e condicionais
+* Timelocks
+
+
+=== Chaves e Assinaturas Digitais
+
+((("Bitcoin (system)","keys and digital signatures", id="ix_appendix-bitcoin-fundamentals-review-asciidoc1", range="startofrange")))((("Bitcoin (system)","private keys", id="ix_appendix-bitcoin-fundamentals-review-asciidoc2", range="startofrange")))((("keys", id="ix_appendix-bitcoin-fundamentals-review-asciidoc3", range="startofrange")))((("private keys", id="ix_appendix-bitcoin-fundamentals-review-asciidoc4", range="startofrange")))Você pode ter ouvido falar que o bitcoin é baseado em _criptografia_, que é um ramo da matemática usado amplamente em segurança computacional. A criptografia também pode ser usada para provar o conhecimento de um segredo sem revelar esse segredo (assinatura digital) ou provar a autenticidade de dados (impressão digital digital). Esses tipos de provas criptográficas são as ferramentas matemáticas fundamentais para o Bitcoin e são amplamente utilizadas em aplicações de Bitcoin.
+
+A propriedade do bitcoin é estabelecida por meio de _chaves digitais_, _endereços de bitcoin_ e _assinaturas digitais_. As chaves digitais não são realmente armazenadas na rede, mas são criadas e armazenadas pelos usuários em um arquivo ou banco de dados simples, chamado _carteira_ (wallet). As chaves digitais na carteira de um usuário são completamente independentes do protocolo Bitcoin e podem ser geradas e gerenciadas pelo software de carteira do usuário sem referência à blockchain ou acesso à internet.
+
+A maioria das transações de Bitcoin requer uma assinatura digital válida para ser incluída no blockchain, que só pode ser gerada com uma chave secreta; portanto, qualquer pessoa que possua uma cópia dessa chave tem controle sobre o bitcoin. A assinatura digital usada para gastar fundos também é chamada de _testemunha_ (witness), um termo usado em criptografia. Os dados da testemunha em uma transação de bitcoin atestam a verdadeira propriedade dos fundos sendo gastos. As chaves são compostas por pares, consistindo de uma chave privada (secreta) e uma chave pública. Pode-se pensar na chave pública como semelhante a um número de conta bancária e na chave privada como semelhante a um PIN secreto.
+
+==== Chaves Privadas e Públicas
+
+Uma chave privada é simplesmente um número escolhido aleatoriamente. Na prática, e para facilitar o gerenciamento de muitas chaves, a maioria das carteiras de Bitcoin gera uma sequência de chaves privadas a partir de uma única _semente_ (seed) aleatória usando um algoritmo de derivação determinística. Em termos simples, um único número aleatório é usado para produzir uma sequência repetível de números aparentemente aleatórios que são usados como chaves privadas. Isso permite que os usuários façam backup apenas da semente e sejam capazes de _derivar_ todas as chaves necessárias a partir dessa semente.
+
+((("elliptic curve")))Bitcoin, assim como muitas outras criptomoedas e blockchains, usa _curvas elípticas_ para segurança.No Bitcoin, a multiplicação de curvas elípticas na curva elíptica _secp256k1_ é usada como uma ((("one-way function")))_função unidirecional_. Simplificando, a natureza da matemática de curvas elípticas torna trivial calcular a multiplicação escalar de um ponto, mas impossível calcular a inversa (divisão ou logaritmo discreto).
+
+((("Bitcoin (system)","public keys")))((("public keys")))Cada chave privada tem uma _chave pública_ correspondente, que é calculada a partir da chave privada usando a multiplicação escalar na curva elíptica. Em termos simples, com uma chave privada _k_, podemos multiplicá-la por uma constante _G_ para produzir uma chave pública _K_:
+
+++++
+<ul class="simplelist">
+<li><em>K</em> = <em>k</em>*<em>G</em></li>
+</ul>
+++++
+
+É impossível reverter esse cálculo. Dada uma chave pública _K_, não é possível calcular a chave privada _k_. A divisão por _G_ não é possível na matemática de curvas elípticas. Em vez disso, seria necessário tentar todos os valores possíveis de _k_ em um processo exaustivo chamado de _ataque de força bruta_. Como _k_ é um número de 256 bits, esgotar todos os valores possíveis com qualquer computador clássico exigiria mais tempo e energia do que está disponível neste universo.
+
+==== Hashes
+
+((("Bitcoin (system)","hashes", id="ix_appendix-bitcoin-fundamentals-review-asciidoc5", range="startofrange")))((("cryptographic hash functions", id="ix_appendix-bitcoin-fundamentals-review-asciidoc6", range="startofrange")))((("hashes", id="ix_appendix-bitcoin-fundamentals-review-asciidoc7", range="startofrange")))Outra ferramenta importante usada extensivamente no Bitcoin e na Lightning Network são as _funções de hash criptográficas_, especificamente a função de hash SHA-256.
+
+((("digest function")))((("hash function, defined")))Uma função de hash, também conhecida como função de resumo, é uma função que recebe dados de comprimento arbitrário e os transforma em um resultado de comprimento fixo, chamado de _hash_, _resumo_ ou _impressão digital_(consulte <<SHA256>>). É importante ressaltar que as funções de hash são funções _unidirecionais_, o que significa que você não pode revertê-las e calcular os dados de entrada a partir da impressão digital.
+
+[[SHA256]]
+.O algoritmo de hash criptográfico SHA-256
+image::images/mtln_aa01.png["The SHA-256 cryptographic hash algorithm"]
+
+[role="pagebreak-before"]
+Por exemplo, se usarmos um terminal de linha de comando para inserir o texto "Dominando a Lightning Network" na função SHA-256, ela produzirá uma impressão digital da seguinte forma:
+
+----
+$ echo -n "Mastering the Lightning Network" | shasum -a 256
+
+ce86e4cd423d80d054b387aca23c02f5fc53b14be4f8d3ef14c089422b2235de  -
+----
+
+[DICA]
+====
+O input usado para calcular o hash também é chamado de _pré-imagem_.
+====
+
+O comprimento da entrada pode ser muito maior, é claro. Vamos tentar a mesma coisa com o https://bitcoin.org/bitcoin.pdf[PDF do Bitcoin whitepaper] de Satoshi Nakamoto:
+
+----
+$ wget http://bitcoin.org/bitcoin.pdf
+$ cat bitcoin.pdf | shasum -a 256
+b1674191a88ec5cdd733e4240a81803105dc412d6c6708d53ab94fc248f4f553  -
+----
+
+Embora leve mais tempo do que uma única frase, a função SHA-256 processa o PDF de 9 páginas, "digerindo-o" em uma impressão digital de 256 bits.
+
+Neste ponto, você pode estar se perguntando como é possível que uma função que digere dados de tamanho ilimitado possa produzir uma impressão digital única que é um número de tamanho fixo.
+
+Em teoria, como há um número infinito de pré-imagens possíveis (inputs) e apenas um número finito de impressões digitais, deve haver muitas pré-imagens que produzem a mesma impressão digital de 256 bits. ((("collision")))Quando duas pré-imagens produzem o mesmo hash, isso é conhecido como uma _colisão_.
+
+Na prática, um número de 256 bits é tão grande que você nunca encontrará uma colisão intencionalmente. As funções de hash criptográficas funcionam com base no fato de que uma busca por uma colisão é um esforço de força bruta que requer tanta energia e tempo que não é praticamente possível.
+
+As funções hash criptográficas são amplamente usadas em uma variedade de aplicativos porque possuem alguns recursos úteis. Elas são:
+
+Determinísticas:: O mesmo input sempre produz o mesmo hash.
+
+Irreversíveis:: Não é possível calcular a pré-imagem de um hash.
+
+À prova de colisão:: É computacionalmente inviável encontrar duas mensagens que tenham o mesmo hash.
+
+Descorrelacionadas: Uma pequena alteração na entrada produz uma mudança tão grande na saída que a saída parece não estar correlacionada com a entrada.
+
+Uniformes/aleatórias:: Uma função hash criptográfica produz hashes que são distribuídos uniformemente por todo o espaço de 256 bits de saídas possíveis. A saída de um hash parece ser aleatória, embora não seja verdadeiramente aleatória.
+
+Usando essas características de hashes criptográficos, podemos construir algumas pass:[<span class="keep-together">aplicações</span>]: interessantes.
+
+Impressões digitais: Um hash pode ser usado para atribuir uma impressão digital única a um arquivo ou mensagem, de forma que possa ser identificado de maneira única. Hashes podem ser usados como identificadores universais para qualquer conjunto de dados.
+
+Prova de integridade: Uma impressão digital de um arquivo ou mensagem demonstra sua integridade, pois o arquivo ou mensagem não pode ser adulterado ou modificado de nenhuma maneira sem alterar a impressão digital. Isso é frequentemente usado para garantir que o software não tenha sido adulterado antes de instalá-lo em seu computador.
+
+Comprometimento/não repúdio: Você pode se comprometer com uma pré-imagem específica (por exemplo, um número ou mensagem) sem revelá-la, publicando seu hash. Posteriormente, você pode revelar o segredo, e todos podem verificar que é a mesma coisa com a qual você se comprometeu anteriormente, pois produz o hash publicado.
+
+Proof-of-work/hash grinding: Prova de trabalho. Você pode usar um hash para provar que realizou trabalho computacional mostrando um padrão não aleatório no hash, que só pode ser produzido por suposições repetidas de uma pré-imagem. Por exemplo, o hash do cabeçalho de um bloco de Bitcoin começa com muitos bits zero. A única maneira de produzi-lo é alterar uma parte do cabeçalho e calcular o hash trilhões de vezes até que ele produza esse padrão por acaso.
+
+Atomicidade: Você pode fazer com que uma pré-imagem secreta seja um pré-requisito para gastar fundos em várias transações vinculadas. Se qualquer uma das partes revelar a pré-imagem para gastar uma das transações, todas as outras partes também poderão gastar suas transações. Todas ou nenhuma se tornam gastáveis, alcançando atomicidade em várias transações.(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc7")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc6")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc5")))
+
+==== Assinaturas Digitais
+
+((("Bitcoin (system)","digital signatures")))((("digital signatures")))A chave privada é usada para criar assinaturas que são necessárias para gastar bitcoins, provando a propriedade dos fundos usados em uma transação.
+
+Uma _assinatura digital_ é um número calculado a partir da aplicação da chave privada a uma mensagem específica.
+
+Dada uma mensagem _m_ e uma chave privada _k_, uma função de assinatura __F~sign~__ pode produzir uma assinatura _S_:
+
+[latexmath]
+++++
+$ S = F_{sign}(m, k) $
+++++
+
+Esta assinatura _S_ pode ser verificada independentemente por qualquer pessoa que tenha a chave pública _K_ (correspondente à chave privada _k_) e a mensagem:
+
+[latexmath]
+++++
+$ F_{verify}(m, K, S) $
+++++
+
+Se __F~verify~__ retornar um resultado verdadeiro, então o verificador pode confirmar que a mensagem _m_ foi assinada por alguém que teve acesso à chave privada _k_. É importante ressaltar que a assinatura digital comprova a posse da chave privada _k_ no momento da assinatura, sem revelar _k_.
+
+As assinaturas digitais utilizam um algoritmo de hash criptográfico. A assinatura é aplicada a um hash da mensagem, de modo que a mensagem _m_ seja "resumida" para um hash de comprimento fixo _H_(_m_) que funciona como uma impressão digital.
+
+Ao aplicar a assinatura digital no hash de uma transação, a assinatura não apenas comprova a autorização, mas também trava (locks) os dados da transação, garantindo sua integridade. Uma transação assinada não pode ser modificada, pois qualquer alteração resultaria em um hash diferente e invalidaria a assinatura.
+
+==== Tipos de Assinatura
+
+((("signature hash type")))As assinaturas nem sempre são aplicadas em toda a transação. Para fornecer flexibilidade na assinatura, uma assinatura digital do Bitcoin contém um prefixo chamado de tipo de hash da assinatura, que especifica qual parte dos dados da transação é incluída no hash. Isso permite que a assinatura comprometa ou "trave" (lock) todos, ou apenas alguns, dos dados na transação. O tipo de hash de assinatura mais comum é +SIGHASH_ALL+, que bloqueia tudo na transação ao incluir todos os dados da transação no hash que é assinado. Em comparação, +SIGHASH_SINGLE+ bloqueia todas as entradas da transação, mas apenas uma saída (mais sobre entradas—inputs e saídas—outputs na próxima seção). Diferentes tipos de hash de assinatura podem ser combinados para produzir seis "padrões" diferentes de dados da transação que são bloqueados pela assinatura.
+
+Mais informações sobre os tipos de hash de assinatura podem ser encontradas em https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch06.asciidoc#sighash_types[the section "Signature Hash Types" in Chapter 6 of _Mastering Bitcoin_, Second Edition].(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc4")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc3")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc2")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc1")))
+
+=== Transações Bitcoin
+
+((("Bitcoin (system)","transactions", id="ix_appendix-bitcoin-fundamentals-review-asciidoc8", range="startofrange")))((("Bitcoin transactions", id="ix_appendix-bitcoin-fundamentals-review-asciidoc9", range="startofrange")))_Transações_ são estruturas de dados que codificam a transferência de valor entre os participantes do sistema Bitcoin.
+
+[[utxo]]
+==== Inputs e Outputs
+
+((("Bitcoin transactions","inputs and outputs", id="ix_appendix-bitcoin-fundamentals-review-asciidoc10", range="startofrange")))O elemento fundamental de uma transação de Bitcoin é uma saída de transação—transaction output). ((("transaction outputs")))_As saídas de transação_ ou _outputs de transação_ são porções indivisíveis da moeda bitcoin, registradas na blockchain e reconhecidas como válidas por toda a rede. Uma transação gasta entradas (inputs) e cria saídas (outputs). ((("transaction inputs")))_Os inputs de transação_ são simplesmente referências aos outputs de transações previamente registradas. Dessa forma, cada transação gasta os outputs de transações anteriores e cria novos outputs. (see <<transaction_structure>>).
+
+[[transaction_structure]]
+.A transaction transfers value from inputs to outputs
+image::images/mtln_aa02.png["transaction inputs and outputs"]
+
+((("unspent transaction outputs (UTXOs)")))((("UTXOs (unspent transaction outputs)")))Os nós completos do Bitcoin rastreiam todas as saídas disponíveis e gastáveis, conhecidas como Unspent Transaction Outputs (UTXOs). A coleção de todos os UTXOs é conhecida como o conjunto UTXO, que atualmente possui milhões de UTXOs. O conjunto UTXO cresce à medida que novos UTXOs são criados e diminui quando os UTXOs são consumidos. Cada transação representa uma alteração (transição de estado) no conjunto UTXO, consumindo um ou mais UTXOs como _inputs de transação_  e criando um ou mais UTXOs como seus _outputs de transação_. 
+
+Por exemplo, vamos supor que a usuária Alice possui um UTXO de 100.000 satoshis que ela pode gastar. Alice pode pagar a Bob 100.000 satoshis construindo uma transação com um input (consumindo sua entrada existente de 100.000 satoshis) e uma output que "paga" Bob com 100.000 satoshis. Agora Bob possui um UTXO de 100.000 satoshis que ele pode gastar, criando uma nova transação que consome esse novo UTXO e o gasta para outro UTXO como pagamento a outro usuário, e assim por diante (veja <<alice_100ksat_to_bob>>).
+
+[[alice_100ksat_to_bob]]
+.Alice pays 100,000 satoshis to Bob
+image::images/mtln_aa03.png["Alice paga 100,000 satoshis para Bob"]
+
+Um output de transação pode ter um valor arbitrário (inteiro) denominado em satoshis. Assim como os dólares podem ser divididos em duas casas decimais, conhecidas como centavos, o bitcoin pode ser dividido em oito casas decimais, denominadas satoshis. Embora um output possa ter qualquer valor arbitrário, uma vez criado, ele é indivisível. Essa é uma característica importante dos outputs que precisa ser enfatizada: as saídas são unidades discretas e indivisíveis de valor, denominadas em satoshis inteiros. Um output não gasto só pode ser consumido integralmente por uma transação.
+
+Nesse caso, se Alice deseja pagar a Bob 50.000 satoshis, mas possui apenas um UTXO indivisível de 100.000 satoshis, Alice precisará criar uma transação que consuma (como entrada) o UTXO de 100.000 satoshis e tenha duas saídas: uma que pague 50.000 satoshis para Bob e outra que pague 50.000 satoshis de volta para Alice como "troco"  (veja <<alice_50ksat_to_bob_change>>).
+
+[[alice_50ksat_to_bob_change]]
+.Alice paga 50.000 sat para Bob e 50.000 sat para si mesma como troco
+image::images/mtln_aa04.png["Alice paga 50.000 satoshis para Bob e 50.000 satoshis para si mesma como troco."]
+
+[DICA]
+====
+Não há nada de especial em uma saída de troco (change output) ou qualquer maneira de distingui-la de qualquer outro output. Ela não precisa ser a última saída. Pode haver mais de uma saída de troco, ou nenhuma saída de troco. Apenas o criador da transação sabe quais outputs são destinados a outras pessoas e quais outputs são destinados a endereços de sua propriedade e, portanto, são "troco".
+====
+
+Da mesma forma, se Alice quiser pagar a Bob 85.000 satoshis, mas tiver duas UTXOs (Unspent Transaction Outputs) de 50.000 satoshis disponíveis, ela precisará criar uma transação com duas entradas (consumindo ambas as suas UTXOs de 50.000 satoshis) e duas saídas, pagando 85.000 satoshis a Bob e enviando 15.000 satoshis de volta para si mesma como troco. (veja <<tx_twoin_twoout>>).
+
+[[tx_twoin_twoout]]
+.Alice usa duas entradas de 50.000 para pagar 85.000 sat para Bob e 15.000 sat para si mesma como troco
+image::images/mtln_aa05.png["Alice usa duas entradas de 50.000 satoshis para pagar 85.000 satoshis a Bob e 15.000 satoshis para si mesma como troco."]
+
+As ilustrações e exemplos anteriores mostram como uma transação de Bitcoin combina (gasta) uma ou mais entradas e cria uma ou mais saídas. Uma transação pode ter centenas ou até milhares de entradas e saídas.
+
+[DICA]
+====
+Enquanto as transações criadas pela Lightning Network têm várias saídas, elas não possuem um "troco" propriamente dito, porque o saldo total disponível em um canal é dividido entre os dois parceiros do canal.(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc10")))
+====
+
+==== Cadeias de Transação
+
+((("Bitcoin transactions","transaction chains")))((("transaction chains")))Cada saída pode ser gasta como entrada em uma transação subsequente. Portanto, por exemplo, se Bob decidir gastar 10.000 satoshis em uma transação para pagar a Chan, e a Chan gastar 4.000 satoshis para pagar a Dina, isso seria demonstrado como mostrado em <<tx_chain>>.
+
+Um output é considerado _spent_ (gasto) se for referenciado como um input em outra transação registrada na blockchain. Um output é considerado _unspent_ (e disponível para gastos) se nenhuma transação registrada fizer referência a ele.
+
+O único tipo de transação que não possui inputs é uma transação especial criada por mineradores de Bitcoin chamada _coinbase transaction_. A transação coinbase tem apenas outputs (saídas) e nenhuma entrada porque cria novos bitcoins a partir da mineração. Todas as outras transações gastam uma ou mais saídas previamente registradas como suas entradas.
+
+Uma vez que as transações são encadeadas, se você escolher uma transação aleatoriamente, você pode seguir qualquer um dos seus inputs de volta até a transação anterior que a criou. Se você continuar fazendo isso, eventualmente chegará a uma transação de coinbase onde o bitcoin foi minerado pela primeira vez.
+
+[[tx_chain]]
+.Alice paga Bob que paga Chan que paga Dina
+image::images/mtln_aa06.png["Alice paga a Bob, que paga a Chan, que paga a Dina."]
+
+
+==== TxID: Transaction Identifiers (IDs de Transação)
+
+((("Bitcoin transactions","transaction identifiers")))((("TxID (transaction identifiers)")))Cada transação no sistema Bitcoin é identificada por um identificador único (assumindo a existência do BIP-0030), chamado de _transaction ID_ ou  _TxID_ abreviado. Para produzir um identificador único, utilizamos a função hash criptográfica SHA-256 para gerar um hash dos dados da transação. Essa "impressão digital" serve como um identificador universal. Uma transação pode ser referenciada pelo seu TxID e, uma vez que uma transação é registrada na blockchain do Bitcoin, todos os nós na rede Bitcoin sabem que essa transação é válida.
+
+Por exemplo, um ID de transação pode se parecer com isto:
+
+.Um ID de transação produzido a partir do hash dos dados da transação
+----
+e31e4e214c3f436937c74b8663b3ca58f7ad5b3fce7783eb84fd9a5ee5b9a54c
+----
+
+Esta é uma transação real (criada como exemplo para o livro _Dominando Bitcoin_) que pode ser encontrada na blockchain do Bitcoin. Tente encontrá-lo inserindo este TxID em um block explorer (explorador de blocos):
+
+++++
+<ul class="simplelist">
+<li><a href="https://blockstream.info/tx/e31e4e214c3f436937c74b8663b3ca58f7ad5b3fce7783eb84fd9a5ee5b9a54c"><em>https://blockstream.info/tx/e31e4e214c3f436937c74b8663b3ca58f7ad5b3fce7783eb84fd9a5ee5b9a54c</em></a></li></ul>
+++++
+
+ou use o link curto (case sensitive):
+
+++++
+<ul class="simplelist">
+<li><a href="http://bit.ly/AliceTx"><em>http://bit.ly/AliceTx</em></a></li>
+</ul>
+++++
+
+==== Outpoints: Output Identifiers (Identificadores de Saídas)
+
+((("Bitcoin transactions","outpoints (output identifiers)")))((("outpoints (output identifiers)")))Como cada transação tem um ID único, também podemos identificar unicamente uma saída de transação dentro daquela transação por referência ao TxID e ao número do índice de saída (output index number). A primeira saída em uma transação é o índice de saída 0, a segunda saída é o índice de saída 1, e assim por diante. Um identificador de saída é comumente conhecido como _outpoint_.
+
+Por convenção, escrevemos um outpoint como o TxID, seguido de dois pontos (":") e o número do índice de saída—output index number.
+
+.Um outpoint: identificando uma saída por TxID e número de índice
+----
+7957a35fe64f80d234d76d83a2a8f1a0d8149a41d81de548f0a65a8a999f6f18:0
+----
+
+Identificadores de saída (outpoints) são os mecanismos que conectam as transações em uma cadeia. Cada transaction input é uma referência a uma saída específica de uma transação anterior. Essa referência é um outpoint: um TxID e um número de índice de saída. Portanto, uma transação "gasta" uma saída específica (por número de índice) de uma transação específica (por TxID) para criar novas saídas que podem ser gastas por referência ao outpoint.
+
+<<tx_chain_vout>> mostra a cadeia de transações de Alice para Bob, para Chan, para Dina, desta vez com outpoints em cada uma das entradas.
+
+[[tx_chain_vout]]
+.Entradas de transação referem-se a pontos de saída formando uma corrente
+image::images/mtln_aa07.png["Inputs de transação se referem a outpoints formando uma corrente"]
+
+O input na transação de Bob faz referência à transação de Alice (pelo TxID) e do input com index 0.
+
+O input na transação de Chan faz referência ao TxID da transação de Bob e o primeiro output indexado , porque o pagamento para o output de Chan é #1. No pagamento de Bob para Chan, o "troco" de Bob é o output #0.footnote:[Lembre-se de que o troco não precisa ser o último output em uma transação e, na verdade, é indistinguível de outros inputs.]
+
+Agora, se observarmos o pagamento de Alice para Bob, podemos ver que Alice está gastando um outpoint que era o terceiro (output index #2) na transação cujo ID é 6a5f1b3[...]. Não vemos essa transação referenciada no diagrama, mas podemos deduzir esses detalhes a partir do outpoint.(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc9")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc8")))
+
+=== Bitcoin Script
+
+((("Bitcoin (system)","script", id="ix_appendix-bitcoin-fundamentals-review-asciidoc11", range="startofrange")))((("Bitcoin script", id="ix_appendix-bitcoin-fundamentals-review-asciidoc12", range="startofrange")))O elemento final do Bitcoin necessário para completar nosso entendimento é a linguagem de script que controla o acesso aos outpoints. Até agora, simplificamos a descrição dizendo "Alice assina a transação para pagar Bob". No entanto, nos bastidores, há uma complexidade oculta que torna possível implementar condições de gastos mais complexas. A condição de gasto mais simples e comum é "apresentar uma assinatura que corresponda à seguinte chave pública". Uma condição de gasto como essa é registrada em cada saída como um _locking script_ escrito em uma linguagem de script chamada _Bitcoin Script_.
+
+Bitcoin Script é uma linguagem de script extremamente simples baseada em pilha (stack-based scripting language). Ela não contém loops ou recursão e, portanto, é _Turing incompleta_ (o que significa que não pode expressar complexidade arbitrária e possui execução previsível). Aqueles familiarizados com a (agora antiga) linguagem de programação FORTH reconhecerão a sintaxe e o estilo.
+
+==== Executando um Bitcoin Script
+
+((("Bitcoin script","running")))Em termos simples, o sistema Bitcoin avalia o Bitcoin Script executando o script em uma pilha (stack); se o resultado final for +TRUE+ (verdadeiro), o script considera a condição de gasto satisfeita e a transação válida.
+
+Vamos analisar um exemplo muito simples de Bitcoin Script, que adiciona os números 2 e 3 e, em seguida, compara o resultado com o número 5:
+
+----
+2 3 ADD 5 EQUAL
+----
+
+Em <<figa08>>, nós vemos como este script é executado (da esquerda para a direita).
+
+[[figa08]]
+.Exemplo de execução do Bitcoin Script
+image::images/mtln_aa08.png["Exemplo de Bitcoin Script em execução"]
+
+[role="pagebreak-before less_space"]
+==== Scripts de Bloqueio (Locking) e Desbloqueio (Unlocking)
+
+((("Bitcoin script","locking/unlocking")))Bitcoin Script é composto por duas partes:
+
+Scripts de bloqueio:: ((("locking scripts")))Os locking scripts são integrados nos outputs de transação, definindo as condições que devem ser cumpridas para o gasto do output.  Por exemplo, a carteira de Alice adiciona um script de bloqueio ao output que paga Bob, estabelecendo a condição de que a assinatura de Bob é necessária para gastá-lo.
+
+Scripts de desbloqueio:: ((("unlocking scripts")))Os unlocking scripts são integrados aos inputs de transação, cumprindo as condições estabelecidas pelo locking script do output referenciado. Por exemplo, Bob pode desbloquear o output anterior fornecendo um script de desbloqueio contendo uma assinatura digital.
+
+Usando um modelo simplificado, para validação, o script de desbloqueio e o script de bloqueio são concatenados e executados (P2SH e SegWit são exceções). Por exemplo, se alguém bloqueou um output de transação com o script de bloqueio "+3 ADD 5 EQUAL+", poderíamos gastá-la com o script de desbloqueio "+2+" em uma entrada de transação. Qualquer pessoa que valide essa transação irá concatenar nosso script de desbloqueio (+2+) e o script de bloqueio (+3 ADD 5 EQUAL+) e executar o resultado através do mecanismo de execução do Bitcoin Script. Eles obteriam +TRUE+ e nós seríamos capazes de gastar a saída.
+
+Obviamente, esse exemplo simplificado seria uma péssima escolha para bloquear um output real de Bitcoin, pois não há segredo, apenas aritmética básica. Qualquer pessoa poderia gastar o output fornecendo a resposta "2". Portanto, a maioria dos scripts de bloqueio requer demonstração do conhecimento de um segredo.
+
+==== Bloqueio por Chave Pública (Assinatura)
+
+((("Bitcoin script","locking to a public key (signature)")))((("locking scripts","locking to a public key (signature)")))((("signatures, locking to a public key")))A forma mais simples de um script de bloqueio é aquele que requer uma assinatura. Vamos considerar a transação de Alice que paga 50.000 satoshis a Bob. O output que Alice cria para pagar Bob terá um script de bloqueio que exige a assinatura de Bob e teria a seguinte aparência:
+
+[[bob_locking_script]]
+.Um script de bloqueio que requer uma assinatura digital da chave privada de Bob
+----
+<Bob Public Key> CHECKSIG
+----
+
+O operador `CHECKSIG` retira dois elementos da stack: uma assinatura e uma chave pública. Como você pode ver, a chave pública de Bob está no script de bloqueio, então o que está faltando é a assinatura correspondente a essa chave pública. Esse script de bloqueio só pode ser gasto por Bob, porque somente Bob possui a chave privada correspondente necessária para produzir uma assinatura digital que corresponda à chave pública.
+
+Para desbloquear esse script de bloqueio, Bob forneceria um script de desbloqueio contendo apenas sua assinatura digital:
+
+[[bob_unlocking_script]]
+.Um script de desbloqueio contendo (apenas) uma assinatura digital da chave privada de Bob
+----
+<Bob Signature>
+----
+
+Em <<locking_unlocking_chain>>você pode ver o script de bloqueio na transação de Alice (no output que paga Bob) e o script de desbloqueio (no input que gasta aquele output) na transação de Bob.
+
+[[locking_unlocking_chain]]
+. Uma cadeia de transações mostrando o script de bloqueio (saída) e o script de desbloqueio (entrada)
+image::images/mtln_aa09.png["Uma corrente de transações mostrando o  locking script (output) and unlocking script (input)]
+
+Para validar a transação de Bob, um node (nó) Bitcoin faria o seguinte:
+
+. Extrair o unlocking script do input (+<Bob Signature>+).
+. Procurar o outpoint que ele está tentando gastar (+a643e37...3213:0+). Esta é a transação de Alice e seria encontrada na blockchain.
+. Extrair o locking script daquele outpoint (+<Bob PubKey> CHECKSIG+).
+. Concatenar em um script, colocando o unlocking script na frente do locking script (+<Bob Signature><Bob PubKey> CHECKSIG+).
+. Executar este script no mecanismo de execução de Bitcoin Script para ver qual resultado é produzido.
+. Se o resultado for +TRUE+, deduzIR que a transação de Bob é válida pois ela conseguiu cumprir a condição de gasto (spending condition) para gastar aquele outpoint.
+
+==== Bloqueio por Hash (Segredo)
+
+((("hashlock")))((("locking scripts","locking to a hash (secret)")))Outro tipo de script de bloqueio, usado na Lightning Network, é o _hashlock_ (bloqueio por hash). Para desbloqueá-lo, você precisa conhecer o _preimage_ (pré-imagem) secreto correspondente ao hash.
+
+Para demonstrar isso, vamos fazer com que Bob gere um número aleatório +R+ e o mantenha em segredo:
+
+----
+R = 1833462189
+----
+
+[role="pagebreak-before"]
+Agora, Bob calcula o hash SHA-256 deste número:
+
+----
+H = SHA256(R) =>
+H = SHA256(1833462189) =>
+H = 0ffd8bea4abdb0deafd6f2a8ad7941c13256a19248a7b0612407379e1460036a
+----
+
+Agora, Bob dá o hash +H+ que calculamos anteriormente para Alice, mas mantém o número +R+ em segredo. Lembre-se de que, devido às propriedades dos hashes criptográficos, Alice não pode "reverter" o cálculo do hash e adivinhar o número +R+.
+
+Alice cria uma saída pagando 50.000 satoshi com o script de bloqueio:
+
+----
+HASH256 H EQUAL
+----
+
+onde +H+ é o valor real do hash (+0ffd8...036a+) que Bob deu a Alice.
+
+Vamos explicar este script:
+
+O operador +HASH256+ extrai um valor do stack e calcula o hash SHA-256 de tal valor. Em seguida, ele coloca o resultado no stack.
+
+O valor +H+ é colocado no stack e, em seguida, o operador +EQUAL+ verifica se os dois valores são iguais e coloca +TRUE+ ou +FALSE+ no stack de acordo com o resultado.
+
+Portanto, este script de bloqueio só funcionará se for combinado com um script de desbloqueio que contenha +R+, de forma que quando concatenados, tenhamos:
+
+----
+R HASH256 H EQUAL
+----
+
+Apenas Bob conhece +R+, então apenas Bob pode produzir uma transação com um script de desbloqueio revelando o valor secreto +R+.
+
+Curiosamente, Bob pode dar o valor +R+ para qualquer outra pessoa, que pode gastar esse Bitcoin. Isso torna o valor secreto +R+ quase como um "voucher" de bitcoin, já que qualquer um que o possua pode gastar o output que Alice criou. Veremos como esta é uma propriedade útil para a Lightning Network!
+
+[[multisig]]
+==== Multisignature Scripts
+
+((("Bitcoin script","multisignature scripts")))((("multisignature scripts")))A linguagem Bitcoin Script oferece uma multisignature building block (primitive)—um bloco de construção de múltiplas assinaturas—que pode ser usado para construir serviços de custódia (escrow) e configurações de propriedade complexas entre vários participantes. ((("K-of-N scheme")))((("multisignature scheme")))Um arranjo que requer múltiplas assinaturas para gastar bitcoin é chamado de esquema de multisignature, especificado como um esquema _K-de-N_, onde:
+
+* _N_ é o número total de signatários identificados no esquema de multisignature, e
+* _K_ é o _quorum_ ou _threshold_ (limiar): o número mínimo de assinaturas para autorizar o gasto.
+
+[role="pagebreak-before"]
+O script para uma assinatura múltipla __K__-of-__N__ é:
+
+----
+K <PubKey1> <PubKey2> ... <PubKeyN> N CHECKMULTISIG
+----
+
+onde _N_ é o número total de chaves públicas listadas (Chave Pública 1 até Chave Pública _N_) e _K_ é o limite inferior de assinaturas necessárias para gastar o output.
+
+A Lightning Network usa um esquema de assinatura múltipla 2-de-2 para criar um canal de pagamento. Por exemplo, um canal de pagamento entre Alice e Bob seria construído em uma 2-of-2 multisignature como esta:
+
+----
+2 <PubKey Alice> <PubKey Bob> 2 CHECKMULTISIG
+----
+
+O script de bloqueio anterior pode ser satisfeito com um script de desbloqueio contendo um par de assinaturas.:footnote:[O primeiro argumento (0) não tem nenhum significado, mas é necessário devido a um bug na implementação de multisignature do Bitcoin. Esse problema é descrito em _Mastering Bitcoin_. https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch07.asciidoc[Chapter 7].]
+
+----
+0 <Sig Alice> <Sig Bob>
+----
+Os dois scripts juntos formariam o script de validação combinado:
+
+----
+0 <Sig Alice> <Sig Bob> 2 <PubKey Alice> <PubKey Bob> 2 CHECKMULTISIG
+----
+
+Um multisignature locking script pode ser representado por um endereço Bitcoin, codificando o hash do script de bloqueio. Por exemplo, a transação inicial de financiamento de um canal de pagamento Lightning é uma transação que paga para um endereço que codifica um script de bloqueio 2-of-2 multisig dos dois parceiros do canal.
+
+==== Timelock Scripts (Scripts de bloqueio de tempo)
+
+((("Bitcoin script","timelock scripts")))((("timelock scripts")))Outro bloco de construção importante que existe no Bitcoin e é amplamente utilizado na Lightning Network é o _timelock_ (bloqueio temporal). Um timelock é uma restrição de gasto que requer que um determinado tempo ou altura do bloco tenha decorrido antes que o gasto seja permitido. É um pouco como um cheque pré-datado retirado de uma conta bancária que não pode ser descontado antes da data indicada no cheque.
+
+Bitcoin tem dois níveis de timelocks: timelocks de nível de transação (transaction-level timelocks) e timelocks de nível de saída (output-level timelocks).
+
+((("transaction-level timelock")))Um _timelock de nível de transação_ é registrado no campo `nLockTime` da transação e impede que a transação inteira seja aceita antes que o timelock seja atingido. Os timelocks de nível de transação são o mecanismo de timelock mais comumente usado no Bitcoin hoje em dia.
+
+((("output-level timelock")))Um _timelock de nível de saída_ é criado por um operador de script. Existem dois tipos de timelocks de saída: timelocks absolutos e timelocks relativos.
+
+((("absolute timelock")))Os _timelocks absolutos de nível de saída_ são implementados pelo operador +CHECKLOCKTIMEVERIFY+, que geralmente é abreviado na conversa como _CLTV_. Os timelocks absolutos implementam uma restrição de tempo com um carimbo de data/hora ou altura de bloco absolutos, expressando o equivalente a "não gastável antes do bloco 800.000".
+
+((("relative timelock")))Os _timelocks relativos de nível de saída_ são implementados pelo operador +CHECKSEQUENCEVERIFY+, geralmente abreviado na conversa como _CSV_. Os timelocks relativos implementam uma restrição de gasto que é relativa à confirmação da transação, expressando o equivalente a "não pode ser gasto até 1.024 blocos após a confirmação".
+
+[[conditional_scripts]]
+==== Scripts com Múltiplas Condições
+
+((("Bitcoin script","scripts with multiple conditions")))((("conditional clauses")))Um ((("flow control", id="ix_appendix-bitcoin-fundamentals-review-asciidoc13", range="startofrange")))dos recursos mais poderosos do Bitcoin Script é o controle de fluxo, também conhecido como cláusulas condicionais. Você provavelmente está familiarizado com o controle de fluxo em várias linguagens de programação que usam a construção +IF...THEN...ELSE+. As cláusulas condicionais do Bitcoin têm uma aparência um pouco diferente, mas essencialmente seguem a mesma construção.
+
+Em um nível básico, os opcodes condicionais do Bitcoin nos permitem construir um script de bloqueio que possui duas formas de ser desbloqueado, dependendo do resultado +TRUE+/+FALSE+ da avaliação de uma condição lógica. Por exemplo, se x for +TRUE+, o script de bloqueio é A +ELSE+ o script de bloqueio é B.
+
+Além disso, as expressões condicionais do Bitcoin podem ser _nested_ (aninhadas) indefinidamente, o que significa que uma cláusula condicional pode conter outra dentro dela, que contém outra e assim por diante. O controle de fluxo do Bitcoin Script pode ser usado para construir scripts muito complexos com centenas ou até milhares de caminhos de execução possíveis. Não há limite para o nesting (aninhamento), mas as regras de consenso impõem um limite no tamanho máximo, em bytes, de um script.
+
+O Bitcoin implementa o controle de fluxo usando os opcodes +IF+, +ELSE+, +ENDIF+ e +NOTIF+. Além disso, as expressões condicionais podem conter operadores booleanos, como +BOOLAND+, pass:[<span class="keep-together"><code>BOOLOR</code></span>], e +NOT+.
+
+Num primeiro olhar, você pode achar os scripts de controle de fluxo do Bitcoin confusos. Isso ocorre porque o Bitcoin Script é uma linguagem baseada em pilha (stack). Da mesma forma que a operação aritmética latexmath:[$1 + 1$] parece "de trás pra frente" quando expressa em Bitcoin Script como  +1 1 ADD+, as cláusulas de controle de fluxo no
+Bitcoin também parecem estar "invertidas".
+
+Na maioria das linguagens de programação tradicionais (procedurais), o controle de fluxo se parece com isto:
+
+.Pseudocode of flow control in most programming languages
+----
+if (condition):
+  code to run when condition is true
+else:
+  code to run when condition is false
+code to run in either case
+----
+
+Em uma linguagem baseada em pilha como o Bitcoin Script, a condição lógica vem _antes_ do +IF+, o que faz com que pareça "invertida", como neste exemplo:
+
+.Bitcoin Script flow control
+----
+condition
+IF
+  code to run when condition is true
+ELSE
+  code to run when condition is false
+ENDIF
+code to run in either case
+----
+
+Ao ler o Bitcoin Script, lembre-se de que a condição sendo avaliada vem _antes_ do opcode +IF+.
+
+==== Usando Controle de Fluxo em Scripts
+
+((("Bitcoin script","using flow control in")))Um uso muito comum do controle de fluxo no Bitcoin Script é construir um script de bloqueio que oferece várias trajetórias de execução, cada uma representando uma forma diferente de resgatar o UTXO.
+
+Vamos dar uma olhada em um exemplo simples, onde temos dois assinantes, Alice e Bob, e qualquer um deles pode resgatar. Com uma multisig, isso seria expresso como um 1-of-2 multisig script. Para fins de demonstração, faremos a mesma coisa com uma cláusula +IF+:
+
+----
+IF
+ <Alice's Pubkey> CHECKSIG
+ELSE
+ <Bob's Pubkey> CHECKSIG
+ENDIF
+----
+
+Ao olhar para esse script de bloqueio, você pode estar se perguntando: "Onde está a condição? Não há nada antes da cláusula +IF+!"
+
+A condição não faz parte do script de bloqueio. Em vez disso, a condição será _oferecida no script de desbloqueio_, permitindo que Alice e Bob "escolham" qual trajetória de execução desejam seguir.
+
+Alice resgata isso com o script de desbloqueio:
+----
+<Alice's Sig> 1
+----
+
+O +1+ no final serve como a condição (+TRUE+) que fará a cláusula +IF+ executar o primeiro caminho de resgate para o qual Alice possui uma assinatura.
+
+Para que Bob resgate isso, ele teria que escolher a segunda trajetória de execução fornecendo um valor +FALSE+ para a cláusula +IF+:
+
+----
+<Bob's Sig> 0
+----
+
+O script de desbloqueio de Bob coloca um +0+ na pilha, fazendo com que a cláusula +IF+ execute o segundo script (+ELSE+), que requer a assinatura de Bob.
+
+Porque cada uma das duas condições também requer uma assinatura, Alice não pode usar a segunda cláusula e Bob não pode usar a primeira cláusula; eles não possuem as assinaturas necessárias para isso!
+
+Como os fluxos condicionais podem ser aninhados (nested), os valores +TRUE+ / +FALSE+ no script de desbloqueio também podem ser aninhados para navegar em um caminho complexo de condições.
+
+No <<htlc_script_example>> você pode ver um exemplo do tipo de script complexo usado na Lightning Network, com várias condições.footnote:[From https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md[BOLT #3].] Os scripts usados na Lightning Network são altamente otimizados e compactos, para minimizar a pegada na blockchain, portanto, não são fáceis de ler e entender.(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc13"))) Apesar disso, veja se você consegue identificar alguns dos conceitos do Bitcoin Script que aprendemos neste capítulo.(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc12")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc11")))(((range="endofrange", startref="ix_appendix-bitcoin-fundamentals-review-asciidoc0")))
+
+[[htlc_script_example]]
+.Um script complexo usado na Lightning Network
+====
+----
+# To remote node with revocation key
+DUP HASH160 <RIPEMD160(SHA256(revocationpubkey))> EQUAL
+IF
+    CHECKSIG
+ELSE
+    <remote_htlcpubkey> SWAP SIZE 32 EQUAL
+    NOTIF
+        # To local node via HTLC-timeout transaction (timelocked).
+        DROP 2 SWAP <local_htlcpubkey> 2 CHECKMULTISIG
+    ELSE
+        # To remote node with preimage.
+        HASH160 <RIPEMD160(payment_hash)> EQUALVERIFY
+        CHECKSIG
+    ENDIF
+ENDIF
+----
+====

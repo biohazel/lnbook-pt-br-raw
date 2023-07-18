@@ -1,0 +1,55 @@
+== Arquitetura de Rede Relâmpago
+
+((("architecture, Lightning Network", id="ix_06_lightning_architecture-asciidoc0", range="startofrange")))Na primeira parte deste livro, introduzimos os principais conceitos da Lightning Network e trabalhamos em um exemplo abrangente de roteamento de um pagamento e configuração das ferramentas que podemos usar para explorar mais a fundo. Na segunda parte do livro, exploraremos a Lightning Network com muito mais detalhes técnicos, dissecando cada um dos elementos fundamentais.
+
+Nesta seção, iremos detalhar os componentes da Lightning Network de forma mais precisa e fornecer uma visão geral para orientá-lo(a) ao longo dos capítulos seguintes.
+
+=== O Conjunto de Protocolos de Rede Relâmpago
+
+((("architecture, Lightning Network","protocol suite")))((("protocol stack")))A Lightning Network é composta por uma coleção complexa de protocolos que funcionam sobre a internet. Podemos classificar amplamente esses protocolos em cinco camadas distintas que compõem uma _pilha de protocolos_, onde cada camada é construída sobre e utiliza os protocolos da camada inferior. Além disso, cada camada de protocolo abstrai as camadas subjacentes e "oculta" parte da complexidade.
+
+A diagrama de arquitetura mostrado na <<lightning_network_protocol_suite>> fornece uma visão geral dessas camadas e seus protocolos componentes.
+
+[[lightning_network_protocol_suite]]
+.O conjunto de protocolos da Rede Relâmpago
+image::images/mtln_0601.png[]
+
+((("architecture, Lightning Network","layers")))As cinco camadas da Lightning Network, de baixo para cima, são:
+
+Camada de conexão de rede:: Esta camada contém os protocolos que interagem diretamente com os protocolos principais da internet (TCP/IP), protocolos de sobreposição (Tor v2/v3) e serviços da internet (DNS). Esta camada também contém os protocolos de transporte criptográfico que protegem as mensagens pass:[<span class="keep-together">Lightning</span>].
+
+Camada de mensagens: Esta camada contém os protocolos que os nós usam para negociar recursos, formatar mensagens e codificar campos de mensagens.
+
+Camada peer-to-peer (P2P):: Esta camada é a principal camada de protocolo para comunicação entre os nós do Lightning e contém todas as diferentes mensagens trocadas entre os nós.
+
+Camada de roteamento:: Esta camada contém os protocolos usados para rotear pagamentos entre nós, de ponta a ponta e atomicamente. Esta camada contém a funcionalidade principal da Lightning Network: pagamentos roteados.
+
+Camada de pagamento:: A camada mais alta da rede, que apresenta uma interface de pagamento confiável para aplicativos.
+
+=== Lightning em Detalhes
+
+((("architecture, Lightning Network","outline of details")))Pelos próximos 10 capítulos, vamos analisar o conjunto de protocolos e examinar cada componente da Lightning Network em detalhes.
+
+Passamos bastante tempo tentando decidir a melhor ordem de apresentar esses detalhes. Não é uma escolha fácil porque há muita interdependência entre os diferentes componentes: quando você começa a explicar um, percebe que ele envolve vários outros componentes. Em vez de uma abordagem de cima para baixo ou de baixo para cima, acabamos escolhendo um caminho mais sinuoso que começa com os blocos fundamentais mais importantes, que são exclusivos da Lightning Network—Canais de Pagamento—e se expande a partir daí. Mas como esse caminho não é óbvio, usaremos o Conjunto de Protocolos da Lightning mostrado na <<lightning_network_protocol_suite>> como um mapa. Em cada capítulo, vamos nos concentrar em um ou mais componentes relacionados, e você os verá destacados no conjunto de protocolos. É como um marcador de mapa dizendo "Você está aqui!"
+
+Aqui está o que vamos cobrir:
+
+pass:[<a data-type="xref" href="payment_channels" data-xrefstyle="chap-num-title">#payment_channels</a>]:: Neste capítulo, vamos explorar em mais detalhes como os canais de pagamento funcionam, de forma significativamente mais aprofundada do que vimos nas partes anteriores do livro. Vamos examinar a estrutura e o Bitcoin Script das transações de financiamento e compromisso, bem como o processo usado pelos nós para negociar cada etapa do protocolo.
+
+pass:[<a data-type="xref" href="#routing" data-xrefstyle="chap-num-title">#routing</a>]:: Em seguida, iremos montar vários canais de pagamento em uma rede e rotear um pagamento de uma ponta à outra. Nesse processo, vamos mergulhar no contrato inteligente hash time-locked contract (HTLC) e no Bitcoin Script que usamos para construí-lo.
+
+pass:[<a data-type="xref" href="#channel_operation" data-xrefstyle="chap-num-title">#channel_operation</a>]:: Ao juntar os conceitos de um canal de pagamento simples e um pagamento roteado usando HTLCs, vamos agora analisar como os HTLCs fazem parte da transação de compromisso de cada canal. Também examinaremos o protocolo para adicionar, liquidar, falhar e remover HTLCs dos compromissos.
+
+pass:[<a data-type="xref" href="#onion_routing" data-xrefstyle="chap-num-title">#onion_routing</a>]:: A seguir, vamos analisar como as informações do HTLC são propagadas pela rede dentro do protocolo de roteamento onion. Vamos observar o mecanismo de criptografia e descriptografia em camadas que confere à Lightning Network algumas de suas características de privacidade.
+
+pass:[<a data-type="xref" href="#gossip" data-xrefstyle="chap-num-title">#gossip</a>]:: Neste capítulo, vamos analisar como os nós da Lightning Network se encontram e aprendem sobre os canais publicados para construir um grafo de canais que podem ser usados para encontrar caminhos pela rede.
+
+pass:[<a data-type="xref" href="#path_finding" data-xrefstyle="chap-num-title">>#path_finding</a>]:: Em seguida, veremos como as informações do protocolo de divulgação são usadas por cada nó para construir um "mapa" de toda a rede, que pode ser usado para encontrar caminhos de um ponto a outro para rotear pagamentos. Também analisaremos as inovações existentes no roteamento de caminhos, como os pagamentos multipartes.
+
+pass:[<a data-type="xref" href="#wire_protocol" data-xrefstyle="chap-num-title">#wire_protocol</a>]:: A base da Rede Relâmpago é o protocolo peer-to-peer que os nós usam para trocar mensagens sobre a rede e seus canais. Neste capítulo, vamos ver como essas mensagens são construídas e as capacidades de extensão incorporadas nas mensagens, com bits de recursos e codificação Type-Length-Value (TLV).
+
+pass:[<a data-type="xref" href="#encrypted_message_transport" data-xrefstyle="chap-num-title">#encrypted_message_transport</a>]:: Descendo para a parte mais baixa da rede, vamos examinar o sistema de transporte criptografado subjacente que garante o sigilo e a integridade de todas as comunicações entre os nós.(((range="endofrange", startref="ix_06_lightning_architecture-asciidoc0")))
+
+pass:[<a data-type="xref" href="#invoices" data-xrefstyle="chap-num-title">#invoices</a>]:: Uma parte fundamental da Lightning Network são as solicitações de pagamento, também conhecidas como faturas Lightning. Neste capítulo, vamos analisar a estrutura e codificação de uma fatura.
+
+Vamos mergulhar!

@@ -1,0 +1,233 @@
+[role="pagenumrestart"]
+[[intro_what_is_the_lightning_network]]
+== Introdução
+
+Bem-vindo ao _Dominando a Rede Relâmpago_!
+
+((("Lightning Network (generally)", seealso="innovations in Lightning", id="ix_01_introduction-asciidoc0", range="startofrange")))A Rede Relâmpago (Lightning Network, frequentemente abreviada como LN) está mudando a forma como as pessoas trocam valor online e é um dos avanços mais empolgantes na história do Bitcoin.
+Hoje, em 2021, a Rede Relâmpago ainda está em seus estágios iniciais. A Lightning Network é um protocolo para utilizar o Bitcoin de uma maneira inteligente e não óbvia. É uma tecnologia de segunda camada que funciona em cima do Bitcoin.
+
+O conceito da Lightning Network foi proposto em 2015, e a primeira implementação foi lançada em 2018. Até 2021, estamos apenas começando a ver as oportunidades que a Lightning Network oferece ao Bitcoin, incluindo melhorias na privacidade, velocidade e escalabilidade.
+Com um conhecimento sólido da Lightning Network, você pode ajudar a moldar o futuro da rede e ao mesmo tempo criar oportunidades para si mesmo.
+
+Nós presumimos que você já tenha algum conhecimento básico sobre Bitcoin, mas se não tiver, não se preocupe—vamos explicar os conceitos mais importantes do Bitcoin, aqueles que você precisa conhecer para entender a Lightning Network, em <<bitcoin_fundamentals_review>>. Se você quiser aprender mais sobre o Bitcoin, você pode ler _Mastering Bitcoin_, 2ª edição, por Andreas M. Antonopoulos (O'Reilly), disponível em https://github.com/bitcoinbook/bitcoinbook[for free online].
+
+Embora a maior parte deste livro seja escrita para programadores, os primeiros capítulos são escritos de forma acessível para qualquer pessoa, independentemente de sua experiência técnica. Neste capítulo, começaremos com algumas terminologias, em seguida, abordaremos a questão da confiança e sua aplicação nesses sistemas, e finalmente discutiremos a história e o futuro da Lightning Network. Vamos começar.
+
+
+=== Conceitos Básicos da Lightning Network
+
+((("Lightning Network (generally)","basic concepts", id="ix_01_introduction-asciidoc1", range="startofrange")))Conforme exploramos como a Lightning Network realmente funciona, nos deparamos com alguns termos técnicos que podem ser um pouco confusos no início. Embora todos esses conceitos e termos sejam explicados em detalhes à medida que avançamos pelo livro e estão definidos no glossário, algumas definições básicas agora tornarão mais fácil compreender os conceitos nos próximos dois capítulos. Se você ainda não entende todas as palavras nessas definições, tudo bem. Você vai entender mais à medida que avançar no texto.
+
+Blockchain:: ((("blockchain","defined")))Um livro-razão de transações distribuído, produzido por uma rede de computadores. O Bitcoin, por exemplo, é um sistema que produz uma blockchain. A Lightning Network não é em si uma blockchain, nem produz uma blockchain. É uma rede que depende de uma blockchain externa existente para sua segurança.
+
+Assinatura digital:: ((("digital signatures")))Uma assinatura digital é um esquema matemático para verificar a autenticidade de mensagens ou documentos digitais. Uma assinatura digital válida dá ao destinatário motivo para acreditar que a mensagem foi criada por um emissor conhecido, que o emissor não pode negar ter enviado a mensagem e que a mensagem não foi alterada durante a transmissão.
+
+Função Hash:: ((("hash function, defined")))Uma função hash criptográfica é um algoritmo matemático que mapeia dados de tamanho arbitrário para uma sequência de bits de tamanho fixo (um hash) e é projetada para ser uma função unidirecional, ou seja, uma função que é inviável de ser invertida.
+
+Nó:: ((("node, defined")))Um computador que participa de uma rede. Um nó Lightning é um computador que participa da Lightning Network. Um nó Bitcoin é um computador que participa da rede Bitcoin. Normalmente, um usuário da LN executará um nó Lightning _e_ um nó Bitcoin.
+
+On-chain versus off-chain:: ((("on-chain payment","defined")))Um pagamento é considerado _on-chain_ quando é registrado como uma transação na blockchain do Bitcoin (ou em outra blockchain subjacente).((("off-chain payment")))Pagamentos enviados por meio de canais de pagamento entre nós da Lightning e que não são visíveis na blockchain subjacente são chamados de pagamentos _off-chain_ (fora da cadeia). Geralmente, na Lightning Network, as únicas transações on-chain (na blockchain) são aquelas usadas para abrir e fechar um canal de pagamento da Lightning. Existe um terceiro tipo de transação de modificação de canal, chamado de "splicing", que pode ser usado para adicionar/remover a quantidade de fundos comprometidos em um canal.
+
+Pagamento:: ((("payment","defined")))Quando ocorre a troca de valor na Lightning Network, chamamos isso de "pagamento" em comparação com uma "transação" na blockchain do Bitcoin.
+
+Canal de pagamento:: ((("payment channel", seealso="channel entries")))Uma _relação financeira_ entre dois nós na Lightning Network é tipicamente implementada por meio de transações de Bitcoin com múltiplas assinaturas (multisig) que compartilham o controle sobre os bitcoin entre os dois nós da Lightning.
+
+Roteamento versus envio:: ((("routing","sending versus")))((("sending, routing versus")))Ao contrário do Bitcoin, onde as transações são _enviadas_ ao serem transmitidas para todos, a Lightning é uma rede roteada em que os pagamentos são "roteados" por meio de um ou mais canais de pagamento, seguindo um _caminho_ do remetente ao destinatário.
+
+Transação:: ((("transaction, defined")))Uma estrutura de dados que registra a transferência de controle sobre alguns fundos (por exemplo, alguns bitcoin). A Lightning Network depende de transações do Bitcoin (ou de outra blockchain) para rastrear o controle dos fundos.
+
+Definições mais detalhadas desses e de muitos outros termos podem ser encontradas no<<glossary>>. Ao longo deste livro, explicaremos o significado desses conceitos e como essas tecnologias realmente funcionam.
+
+[DICA]
+====
+Ao longo deste livro, você verá "Bitcoin" com a primeira letra em maiúscula, o que se refere ao _sistema Bitcoin_ e é um substantivo próprio. Você também verá "bitcoin", com um _b_ minúsculo, que se refere à unidade de moeda. Cada bitcoin é subdividido em 100 milhões de unidades, chamadas de "satoshi" (singular) ou "satoshis" (plural).(((range="endofrange", startref="ix_01_introduction-asciidoc1")))
+====
+
+Agora que você está familiarizado com esses termos básicos, vamos avançar para um conceito com o qual você já está confortável: confiança.
+
+
+=== Confiança em Redes Descentralizadas
+
+((("Lightning Network (generally)","trust in decentralized networks")))((("trustless systems","trust in decentralized networks")))Você frequentemente ouvirá pessoas chamando o Bitcoin e a Lightning Network de "sem confiança" (trustless). À primeira vista, isso pode ser confuso. Afinal, a confiança não é algo bom? Os próprios bancos usam a confiança em seus nomes! Um sistema "sem confiança" não seria algo ruim?
+
+O uso da palavra "sem confiança" tem o objetivo de transmitir a capacidade de operar sem a _necessidade_ de confiar nos outros participantes do sistema. Em um sistema descentralizado como o Bitcoin, você sempre pode optar por fazer transações com alguém em quem confia. No entanto, o sistema garante que você não possa ser enganado, mesmo se não puder confiar na outra parte envolvida na transação. A confiança é uma propriedade desejável, mas não obrigatória do sistema.
+
+Compare isso com sistemas tradicionais como o bancário, nos quais você precisa depositar sua confiança em uma terceira parte, uma vez que ela controla seu dinheiro. Se o banco violar sua confiança, talvez você possa buscar alguma reparação por meio de um órgão regulador ou tribunal, mas isso demandará um custo enorme em termos de tempo, dinheiro e esforço.
+
+"Sem confiança" não significa completamente sem confiança. Significa que a confiança não é um requisito necessário para todas as transações e que você pode realizar transações mesmo com pessoas em quem não confia, pois o sistema impede fraudes.
+
+Antes de entrarmos em como a Lightning Network funciona, é importante entender um conceito básico que subjacente ao Bitcoin, à Lightning Network e a muitos outros sistemas semelhantes: algo que chamamos de um "protocolo de justiça" (fairness protocol). Um protocolo de justiça é uma forma de alcançar resultados justos entre os participantes, que não precisam confiar uns nos outros, sem a necessidade de uma autoridade central, sendo a base dos sistemas descentralizados como o Bitcoin.
+
+
+=== Justiça Sem Autoridade Central
+
+((("fairness, ensuring")))((("Lightning Network (generally)","fairness without central authority")))Quando as pessoas têm interesses concorrentes, como podem estabelecer confiança suficiente para se engajarem em comportamentos cooperativos ou transacionais? A resposta a essa pergunta reside no cerne de várias disciplinas científicas e humanísticas, como economia, sociologia, psicologia comportamental e matemática. Algumas dessas disciplinas nos fornecem respostas "soft" que dependem de conceitos como reputação, justiça, moralidade e até religião. Outras disciplinas nos fornecem respostas concretas que dependem apenas da suposição de que os participantes dessas interações agirão de forma racional, com o interesse próprio como principal objetivo.
+
+Em termos gerais, existem algumas maneiras de garantir resultados justos em interações entre indivíduos que podem ter interesses conflitantes:
+
+Exigir confiança:: Você interage apenas com pessoas em quem já confia, devido a interações anteriores, reputação ou relacionamentos familiares. Isso funciona bem em uma escala pequena, especialmente dentro de famílias e grupos pequenos, sendo a base mais comum para comportamento cooperativo. Infelizmente, isso não funciona em grande escala e sofre com viés tribalista (favorável ao grupo).
+
+Estado de direito:: Estabelecer regras para interações que são aplicadas por uma instituição. Isso escala melhor, mas não pode ser aplicado globalmente devido às diferenças de costumes e tradições, bem como à incapacidade de expandir as instituições de aplicação. Um efeito colateral desagradável dessa solução é que as instituições se tornam cada vez mais poderosas à medida que crescem, o que pode levar à corrupção.
+
+Terceiras partes confiáveis:: Colocar um intermediário em cada interação para garantir imparcialidade. Combinado com o "estado de direito" para fornecer supervisão dos intermediários, isso escala melhor, mas sofre com o mesmo desequilíbrio de poder: os intermediários se tornam muito poderosos e podem atrair corrupção. A concentração de poder leva a riscos sistêmicos e falhas sistêmicas ("grande demais para falir").
+
+Protocolos de justiça baseados em teoria dos jogos:: Esta última categoria surge da combinação da internet e da criptografia e é o tema desta seção. Vamos ver como eles funcionam e quais são suas vantagens e desvantagens.
+
+==== Protocolos de Confiança Sem Intermediários
+
+((("fairness protocol","trusted protocols without intermediaries")))Sistemas criptográficos como o Bitcoin e a Lightning Network são sistemas que permitem realizar transações com pessoas (e computadores) nas quais você não confia. Isso é frequentemente chamado de operação "sem confiança", embora não seja completamente sem confiança. Você precisa confiar no software que está executando e confiar que o protocolo implementado por esse software resultará em resultados justos.
+
+A grande diferença entre um sistema criptográfico como esse e um sistema financeiro tradicional é que no sistema financeiro tradicional há um _terceiro de confiança_, como um banco, responsável por garantir a equidade dos resultados. Um problema significativo com esses sistemas é que eles concedem poder demais ao terceiro confiável e também são vulneráveis a um _ponto único de falha_. Se o terceiro de confiança violar a confiança ou tentar fraudar, a base da confiança é rompida.
+
+Ao estudar os sistemas criptográficos, você notará um padrão específico: em vez de depender de um terceiro de confiança, esses sistemas tentam evitar resultados injustos usando um sistema de incentivos e desincentivos. Em sistemas criptográficos, você deposita confiança no ((("protocol, defined")))_protocolo_, que é efetivamente um sistema com um conjunto de regras que, se projetado corretamente, aplicará corretamente os incentivos e desincentivos desejados. A vantagem desse método é dupla: você evita confiar em um terceiro e reduz a necessidade de impor resultados justos. Desde que os participantes sigam o protocolo acordado e permaneçam dentro do sistema, o mecanismo de incentivo presente nesse protocolo alcança resultados justos sem necessidade de aplicação coercitiva.
+
+((("game theory")))O uso de incentivos e desincentivos para alcançar resultados justos é um aspecto de um ramo da matemática chamado _teoria dos jogos_, que estuda "modelos de interação estratégica entre tomadores de decisão racionais."footnote:[The Wikipedia https://en.wikipedia.org/wiki/Game_theory[entry on game theory] provides more information.] Sistemas criptográficos que controlam as interações financeiras entre os participantes, como o Bitcoin e a Lightning Network, dependem muito da teoria dos jogos para evitar que os participantes trapaceiem e permitir que participantes que não confiam uns nos outros alcancem resultados justos.
+
+Embora a teoria dos jogos e seu uso em sistemas criptográficos possam parecer confusos e desconhecidos a princípio, é provável que você já esteja familiarizado com esses sistemas em sua vida cotidiana; você simplesmente ainda não os reconhece. Na próxima seção, usaremos um exemplo simples da infância para nos ajudar a identificar o padrão básico. Assim que você entender o padrão básico, verá esse padrão em todos os lugares no espaço blockchain e o reconhecerá rapidamente e intuitivamente.
+
+((("fairness protocol", id="ix_01_introduction-asciidoc2", range="startofrange")))Neste livro, chamamos esse padrão de ((("fairness protocol","defined")))_protocolo de justiça_, definido como um processo que utiliza um sistema de incentivos e/ou desincentivos para garantir resultados justos para participantes que não confiam uns nos outros. A aplicação de um protocolo de justiça só é necessária para garantir que os participantes não possam escapar dos incentivos ou desincentivos.
+
+==== Um Protocolo de Justiça em Ação
+
+((("fairness protocol","real-world example")))Vamos analisar um exemplo de um protocolo de justiça com o qual você já pode estar familiarizado.
+
+Imagine um almoço em família, com um pai e dois filhos. As crianças são exigentes para comer e a única coisa com a qual concordam em comer são batatas fritas. O pai preparou uma tigela de batatas fritas. Os dois irmãos devem compartilhar o prato de batatas fritas. O pai precisa garantir uma distribuição justa das batatas fritas para cada criança; caso contrário, terá que ouvir reclamações constantes (talvez o dia todo), e sempre há a possibilidade de uma situação injusta evoluir para violência. O que um pai deve fazer?
+
+Existem algumas maneiras diferentes de alcançar a justiça nessa interação estratégica entre os dois irmãos que não confiam um no outro e têm interesses concorrentes. O método ingênuo, mas comumente usado, é o pai usar sua autoridade como um terceiro confiável: eles dividem a tigela de batatas fritas em duas porções. Isso é semelhante às finanças tradicionais, onde um banco, contador ou advogado atua como um terceiro confiável para evitar qualquer trapaça entre duas partes que desejam fazer uma transação.
+
+O problema com esse cenário é que ele atribui muito poder e responsabilidade nas mãos do terceiro confiável. Nesse exemplo, o pai é totalmente responsável pela alocação igualitária das batatas fritas, e as partes apenas esperam, observam e reclamam. As crianças acusam o pai de mostrar favoritismo e não distribuir as batatas de forma justa. Os irmãos brigam pelas batatas, gritando "essa batata é maior!" e envolvendo o pai na briga. Isso parece terrível, não é mesmo? O pai deveria gritar mais alto? Tirar todas as batatas? Ameaçar nunca mais fazer batatas e deixar as crianças ingratas passarem fome?
+
+Existe uma solução muito melhor: os irmãos são ensinados a jogar um jogo chamado "dividir e escolher". Em cada almoço, um dos irmãos divide a tigela de batatas fritas em duas porções e o _outro_ irmão escolhe qual porção deseja. Quase imediatamente, os irmãos entendem a dinâmica desse jogo. Se aquele que está dividindo cometer um erro ou tentar trapacear, o outro irmão pode "punir" escolhendo a porção maior. É do interesse de ambos os irmãos, mas especialmente daquele que está dividindo, jogar de forma justa. Somente o trapaceiro sai perdendo nesse cenário. O pai nem precisa usar sua autoridade ou impor justiça. Tudo o que o pai precisa fazer é _fazer cumprir o protocolo_; desde que os irmãos não possam escapar de seus papéis atribuídos de "divisor" e "escolhedor", o próprio protocolo garante um resultado justo sem a necessidade de qualquer intervenção. O pai não pode mostrar favoritismo ou distorcer o resultado.
+
+[AVISO]
+====
+Embora as batalhas de batatas fritas infames dos anos 1980 ilustrem claramente o ponto, qualquer semelhança entre o cenário anterior e quaisquer experiências reais de infância dos autores com seus primos é totalmente coincidência... ou será que não é?
+====
+
+==== Primitivos de Segurança como Blocos de Construção
+
+((("fairness protocol","security primitives as building blocks")))((("security primitives")))Para que um protocolo de justiça como esse funcione, é necessário ter certas garantias, ou _primitivas de segurança_ (security primitives), que podem ser combinadas para garantir a execução do mesmo. A primeira primitiva de segurança é a _ordem/sequenciamento estrito do tempo_: a ação de "dividir" deve ocorrer antes da ação de "escolher". Não é imediatamente óbvio, mas a menos que seja possível garantir que a ação A ocorra antes da ação B, o protocolo se desfaz. A segunda primitiva de segurança é o _comprometimento com não repúdio_. Cada irmão deve se comprometer com seu papel escolhido: seja como divisor ou como escolhedor. Além disso, uma vez que a divisão tenha sido concluída, o divisor fica comprometido com a divisão que criou—não pode repudiar (negar) essa escolha e tentar novamente.
+
+Sistemas criptográficos oferecem uma série de primitivas de segurança que podem ser combinadas de diferentes maneiras para construir um protocolo de justiça. Além do sequenciamento e do comprometimento, também podemos usar várias outras ferramentas:
+
+- Funções hash para criar uma impressão digital dos dados, como forma de compromisso ou como base para uma assinatura digital.
+- Assinaturas digitais para autenticação, não repúdio e comprovação de posse de um segredo.
+- Criptografia/descriptografia para restringir o acesso às informações apenas a participantes autorizados.
+
+Esta é apenas uma pequena lista de uma ampla "coleção" de primitivas de segurança e criptográficas que estão em uso. Primitivas mais básicas e combinações são inventadas o tempo todo.
+
+No nosso exemplo da vida real, vimos uma forma de protocolo de justiça chamado "dividir e escolher". Isso é apenas um dos inúmeros protocolos de equidade diferentes que podem ser construídos combinando os blocos de construção das primitivas de segurança de diferentes maneiras. Mas o padrão básico é sempre o mesmo: dois ou mais participantes interagem sem confiar um no outro, envolvendo-se em uma série de etapas que fazem parte de um protocolo acordado. As etapas do protocolo estabelecem incentivos e desincentivos para garantir que, se os participantes forem racionais, trapacear seja contraproducente e a equidade seja o resultado automático. A execução não é necessária para obter resultados justos - é apenas necessário evitar que os participantes abandonem o protocolo acordado.
+
+Agora que você entende esse padrão básico, começará a vê-lo em todos os lugares no Bitcoin, na Lightning Network e em muitos outros sistemas. Vamos analisar alguns exemplos específicos em seguida.
+
+==== Exemplo do Protocolo de Justiça
+
+((("fairness protocol","Proof of Work example")))((("PoW (Proof of Work) algorithm")))((("Proof of Work (PoW) algorithm")))O exemplo mais proeminente de um protocolo de equidade é o algoritmo de consenso Prova de Trabalho (Proof 0f Work—PoW) do Bitcoin. No Bitcoin, os mineradores competem para verificar transações e agregá-las em blocos. Para garantir que os mineradores não trapaceiem, sem confiar a eles autoridade, o Bitcoin utiliza um sistema de incentivos e desincentivos. Os mineradores precisam usar eletricidade e dedicar hardware para realizar um "trabalho" que é incorporado como uma "prova" dentro de cada bloco. Isso é possível graças a uma propriedade das funções hash em que o valor de saída é distribuído aleatoriamente em todo o intervalo de possíveis saídas. Se os mineradores conseguirem produzir um bloco válido rápido o suficiente, eles são recompensados recebendo a recompensa em bloco por aquele bloco. O fato de os mineradores terem que gastar muita eletricidade antes que a rede considere seu bloco significa que eles têm um incentivo para validar corretamente as transações no bloco. Se trapacearem ou cometerem algum erro, seu bloco é rejeitado e a eletricidade usada para "prová-lo" é desperdiçada. Ninguém precisa forçar os mineradores a produzir blocos válidos; a recompensa e o castigo os incentivam a fazê-lo. Tudo o que o protocolo precisa fazer é garantir que apenas blocos válidos com Proof of Work sejam aceitos.
+
+O padrão do protocolo de justiça também pode ser encontrado em muitos aspectos diferentes da Lightning Network:
+
+* Aqueles que financiam canais garantem que tenham uma transação de reembolso assinada antes de publicarem a transação de financiamento.
+
+* Sempre que um canal é movido para um novo estado, o estado anterior é "revogado" garantindo que se alguém tentar transmiti-lo, perca todo o saldo e seja punido.
+
+* Aqueles que encaminham pagamentos sabem que, se comprometerem fundos para encaminhamento, podem receber um reembolso ou serem pagos pelo nó que os precede.
+
+Mais uma vez, vemos esse padrão. Resultados justos não são impostos por nenhuma autoridade. Eles surgem como consequência natural de um protocolo que recompensa a justiça e pune a trapaça, um protocolo de justiça que direciona o autointeresse para alcançar resultados justos.
+
+Bitcoin e a Lightning Network são ambas implementações de protocolos de justiça. Então, por que precisamos da Lightning Network? O Bitcoin não é suficiente?(((range="endofrange", startref="ix_01_introduction-asciidoc2")))
+
+
+=== Motivação para a Lightning Network
+
+((("Lightning Network (generally)","motivation for", id="ix_01_introduction-asciidoc3", range="startofrange")))O Bitcoin é um sistema que registra transações em um livro-razão público globalmente replicado. Cada transação é vista, validada e armazenada por cada computador participante. Como você pode imaginar, isso gera uma grande quantidade de dados e é difícil de escalar.
+
+Conforme o Bitcoin e a demanda por transações aumentaram, o número de transações em cada bloco aumentou até atingir o limite de tamanho do bloco.
+Uma vez que os blocos estejam "cheios", as transações excedentes ficam em espera em uma fila. Muitos usuários aumentam as taxas que estão dispostos a pagar para adquirir espaço para suas transações no próximo bloco.
+
+Se a demanda continuar superando a capacidade da rede, um número crescente de transações dos usuários ficará aguardando confirmação. A competição por taxas também aumenta o custo de cada transação, tornando muitas transações de valor menor (por exemplo, microtransações) completamente inviáveis durante períodos de demanda especialmente alta.
+
+Para resolver esse problema, poderíamos aumentar o limite de tamanho do bloco para criar espaço para mais transações. Um aumento na "oferta" de espaço de bloco levaria a um equilíbrio de preços mais baixo para as taxas de transação.
+
+No entanto, aumentar o tamanho do bloco transfere o custo para os operadores de nós e exige que eles gastem mais recursos para validar e armazenar a blockchain. Como as blockchains são protocolos de comunicação, cada nó é obrigado a conhecer e validar cada transação que ocorre na rede. Além disso, uma vez validada, cada transação e bloco deve ser propagado para os "vizinhos" do nó, multiplicando os requisitos de largura de banda. Assim, quanto maior o tamanho do bloco, maiores são os requisitos de largura de banda, processamento e armazenamento para cada nó individual. Aumentar a capacidade de transação dessa maneira tem o efeito indesejável de centralizar o sistema, reduzindo o número de nós e operadores de nós. Como os operadores de nós não são compensados por executar os nós, se os nós forem muito caros de serem mantidos, apenas alguns operadores de nós bem financiados continuarão a executá-los.
+
+==== Escalando Blockchains
+
+((("blockchain","scaling", id="ix_01_introduction-asciidoc4", range="startofrange")))((("Lightning Network (generally)","scaling blockchains", id="ix_01_introduction-asciidoc5", range="startofrange")))Os efeitos colaterais de aumentar o tamanho do bloco ou diminuir o tempo do bloco em relação à centralização da rede são graves, como mostram alguns cálculos com os números.
+
+Vamos supor que o uso do Bitcoin cresça a ponto da rede ter que processar 40.000 transações por segundo, que é aproximadamente o nível de processamento de transações da rede Visa durante o uso de pico.
+
+Considerando uma média de 250 bytes por transação, isso resultaria em um fluxo de dados de 10 megabytes por segundo (MBps) ou 80 megabits por segundo (Mbps) apenas para receber todas as transações.
+Isso não inclui o tráfego adicional de encaminhamento das informações das transações para outros pares (peers).
+Embora 10 MBps não pareça extremo no contexto de velocidades de fibra ótica de alta velocidade e redes móveis 5G, isso efetivamente excluiria qualquer pessoa que não possa atender a esse requisito de executar um nó, especialmente em países onde a internet de alta velocidade não é acessível ou amplamente disponível a um custo acessível.
+
+Os usuários também têm muitas outras demandas em sua largura de banda e não pode ser esperado que gastem tanto apenas para receber transações.
+
+Além disso, armazenar essas informações localmente resultaria em 864 gigabytes por dia. Isso equivale aproximadamente a um terabyte de dados, ou seja, o tamanho de um disco rígido.
+
+
+Verificar 40.000 assinaturas do algoritmo de criptografia de curva elíptica (Elliptic Curve Digital Signature Algorithm—ECDSA) por segundo também é quase inviável (see https://bitcoin.stackexchange.com/questions/95339/how-many-bitcoin-transactions-can-be-verified-per-second[this article on StackExchange]), tornando o processo de download de bloco inicial (Initial Block Download—IBD) da blockchain do Bitcoin (sincronização e verificação de tudo a partir do bloco de gênese) quase impossível sem hardware muito caro.
+
+Embora 40.000 transações por segundo pareçam ser um número alto, isso só alcança a paridade com redes de pagamento financeiro tradicionais em momentos de pico. Inovações em pagamentos de máquina para máquina, microtransações e outras aplicações provavelmente aumentarão a demanda para níveis muito superiores a isso.
+
+Em termos simples: não é possível dimensionar uma blockchain para validar todas as transações do mundo de forma descentralizada.
+
+_E se cada nó não precisasse saber e validar todas as transações? E se houvesse uma maneira de ter transações fora da cadeia (off-chain) escaláveis, sem perder a segurança da rede Bitcoin?_
+
+Em fevereiro de 2015, Joseph Poon e Thaddeus Dryja propuseram uma possível solução para o problema de escalabilidade do Bitcoin, com a publicação de "The Bitcoin Lightning Network: Scalable Off-Chain Instant Payments."footnote:[Joseph Poon and Thaddeus Dryja. "The Bitcoin Lightning Network: Scalable Off-Chain Instant Payments." DRAFT Version 0.5.9.2. January 14, 2016. https://lightning.network/lightning-network-paper.pdf[].]
+
+No artigo (agora desatualizado), Poon e Dryja estimam que, para que o Bitcoin alcance as 47.000 transações por segundo processadas em seu pico pelo Visa, seriam necessários blocos de 8 GB.
+Isso tornaria a execução de um nó completamente inviável para qualquer pessoa além de empresas em larga escala e operações de nível industrial.
+O resultado seria uma rede na qual apenas alguns usuários seriam capazes de validar o estado do livro-razão.
+O Bitcoin depende dos usuários validarem o livro-razão por si mesmos, sem confiar explicitamente em terceiros, para se manter descentralizado.
+Ao impedir que os usuários executem nós, devido aos altos custos, o usuário médio seria forçado a confiar em terceiros para descobrir o estado do livro-razão, o que, em última instância, quebraria o modelo de confiança do Bitcoin.
+
+A Lightning Network propõe uma nova rede, uma segunda camada, na qual os usuários podem fazer pagamentos entre si de forma ponto a ponto (peer-to-peer), sem a necessidade de publicar uma transação na blockchain do Bitcoin para cada pagamento.
+Os usuários podem pagar uns aos outros na Lightning Network quantas vezes quiserem, sem criar transações adicionais no Bitcoin ou incorrer em taxas on-chain.
+Eles apenas utilizam a blockchain do Bitcoin para carregar bitcoin inicialmente na Lightning Network e para realizar a liquidação final, ou seja, para remover bitcoin da Lightning Network.
+O resultado é que muitos mais pagamentos em Bitcoin podem ocorrer fora da cadeia, sendo necessário validar e armazenar apenas as transações iniciais de carregamento e as transações finais de liquidação pelos nós do Bitcoin.
+Além de reduzir o ônus sobre os nós, os pagamentos na Lightning Network são mais baratos para os usuários, pois eles não precisam pagar taxas de blockchain, e mais privados, pois não são publicados para todos os participantes da rede e também não são armazenados permanentemente.
+
+Embora a Lightning Network tenha sido inicialmente concebida para o Bitcoin, ela pode ser implementada em qualquer blockchain que atenda a alguns requisitos técnicos básicos. Outras blockchains, como o Litecoin, já suportam a Lightning Network. Além disso, várias outras blockchains estão desenvolvendo soluções semelhantes de segunda camada, ou "camada 2", para ajudá-las a escalar(((range="endofrange", startref="ix_01_introduction-asciidoc5")))(((range="endofrange", startref="ix_01_introduction-asciidoc4"))).(((range="endofrange", startref="ix_01_introduction-asciidoc3")))
+
+=== Os Recursos Definidores da Lightning Network
+
+((("Lightning Network (generally)","defining features")))A Lightning Network é uma rede que opera como um protocolo de segunda camada em cima do Bitcoin e outras blockchains. A Lightning Network permite pagamentos rápidos, seguros, privados, sem necessidade de confiança e sem necessidade de permissão. Aqui estão algumas das características da Lightning Network:
+
+ * Os usuários da Lightning Network podem rotear pagamentos entre si a baixo custo e em tempo real.
+ * Usuários que realizam trocas de valor na Lightning Network não precisam esperar por confirmações de blocos para os pagamentos.
+ * Uma vez que um pagamento na Lightning Network é concluído, geralmente em questão de segundos, ele é final e não pode ser revertido. Assim como uma transação de Bitcoin, um pagamento na Lightning Network só pode ser reembolsado pelo destinatário.
+ * Enquanto as transações de Bitcoin na cadeia (on-chain) são transmitidas e verificadas por todos os nós da rede, os pagamentos roteados na Lightning Network são transmitidos entre pares de nós e não são visíveis para todos, resultando em uma privacidade muito maior.
+ * Ao contrário das transações na rede Bitcoin, os pagamentos roteados na Lightning Network não precisam ser armazenados permanentemente. A Lightning, portanto, utiliza menos recursos e, consequentemente, é mais barata. Essa propriedade também traz benefícios para a privacidade.
+ * A Lightning Network utiliza o roteamento em camadas (onion routing), semelhante ao protocolo utilizado pela rede de privacidade The Onion Router (Tor), de modo que mesmo os nós envolvidos no roteamento de um pagamento estão cientes apenas de seu predecessor e sucessor na rota do pagamento.
+ * Quando usada em cima do Bitcoin, a Lightning Network utiliza bitcoin reais, que estão sempre na posse (custódia) e controle total do usuário. A Lightning não é um token ou moeda separada, ela _é_  Bitcoin.
+
+
+[[user-stories]]
+=== Casos de Uso da Lightning Network, Usuários e Suas Histórias
+
+((("Lightning Network (generally)","use cases and users")))Para compreender melhor como a Lightning Network funciona na prática e por que as pessoas a utilizam, vamos acompanhar diversos usuários e suas histórias. 
+
+Nos exemplos apresentados, algumas pessoas já utilizam o Bitcoin e outras são novatas na rede do Bitcoin. Cada pessoa e sua história, conforme listadas aqui, ilustram um ou mais casos de uso específicos. Voltaremos a essas histórias ao longo deste livro:
+
+Consumidor::
+Alice é uma usuária de Bitcoin que deseja fazer pagamentos rápidos, seguros, baratos e privados para compras de varejo de pequeno valor. Ela compra café usando Bitcoin, utilizando a Lightning Network.
+
+Comerciante::
+Bob é dono de uma cafeteria chamada "Bob's Cafe". Pagamentos em Bitcoin na cadeia principal (on-chain) não são escaláveis para pequenas quantias, como uma xícara de café. Por isso, ele utiliza a Lightning Network para aceitar pagamentos em Bitcoin quase instantaneamente e com baixas taxas.
+
+Negócio de serviços de software::
+Chan é um empreendedor chinês que vende serviços de informação relacionados à Lightning Network, Bitcoin e outras criptomoedas. Chan vende esses serviços de informação pela internet, implementando micropagamentos na Lightning Network. Além disso, Chan implementou um serviço de provedor de liquidez que aluga capacidade de canal de entrada na Lightning Network, cobrando uma pequena taxa em bitcoin por cada período de aluguel.
+
+Gamer::
+Dina é uma adolescente gamer da Rússia. Ela joga vários jogos de computador, mas seus favoritos são aqueles que possuem uma "economia do jogo" baseada em dinheiro real. Enquanto joga, ela também ganha dinheiro adquirindo e vendendo itens virtuais dentro dos jogos. A Lightning Network permite que ela realize transações em pequenas quantias para comprar itens do jogo, além de ganhar pequenas quantias ao completar missões.
+
+=== Conclusão
+
+Neste capítulo, discutimos o conceito fundamental que sustenta tanto o Bitcoin quanto a Lightning Network: o protocolo de justiça.
+
+Analisamos a história da Lightning Network e as motivações por trás das soluções de escalabilidade de segunda camada para o Bitcoin e outras redes baseadas em blockchain.
+
+Aprendemos terminologia básica, incluindo nó, canal de pagamento, transações na cadeia principal (on-chain) e pagamentos fora da cadeia (off-chain).
+
+Por fim, conhecemos Alice, Bob, Chan e Dina, que acompanharemos ao longo do restante do livro.(((range="endofrange", startref="ix_01_introduction-asciidoc0"))) No próximo capítulo, conheceremos Alice e acompanharemos seu processo de pensamento enquanto ela seleciona uma carteira Lightning e se prepara para fazer seu primeiro pagamento na Lightning Network para comprar uma xícara de café na Bob's Cafe.((("Bitcoin (system)","Lightning Network compared to", see="Bitcoin–Lightning Network comparisons")))((("channel", see="payment channel")))((("containers", see="Docker containers")))((("delivering payment", see="payment delivery")))((("DoS attacks", see="denial-of-service attacks")))((("encrypted message transport", see="Lightning encrypted transport protocol")))((("future issues", see="innovations in Lightning")))((("HTLCs", see="hash time-locked contracts")))((("invoices", see="Lightning invoices")))((("Lightning Network (generally)","Bitcoin compared to", see="Bitcoin–Lightning Network comparisons")))((("Lightning Network (generally)","invoices", see="Lightning invoices")))((("Lightning Network (generally)","network architecture", see="architecture, Lightning Network")))((("Lightning Network node", see="Lightning node entries")))((("Lightning payment requests", see="Lightning invoices")))((("LN node", see="Lightning node entries")))((("LND node project", see="Lightning Network Daemon node project")))((("message transport", see="Lightning encrypted transport protocol")))((("node", see="Lightning node entries")))((("payment channel","routing on network of", see="routing")))((("payment requests", see="Lightning invoices")))((("payment routing", see="routing")))((("privacy", see="breaches of privacy")))((("privacy", see="security and privacy")))((("private channels", see="unannounced channels")))((("TLV", see="Type-Length-Value")))((("wallet", see="Lightning wallet")))

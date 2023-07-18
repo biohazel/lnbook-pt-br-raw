@@ -1,0 +1,970 @@
+[[operating_ln_node]]
+[[node_operations]]
+== Operando um Nó de Rede Lightning
+
+((("Lightning node operation", id="ix_05_node_operations-asciidoc0", range="startofrange")))Após ter lido até aqui, você provavelmente configurou uma carteira de Lightning. Neste capítulo, vamos dar um passo adiante e configurar um nó completo de Lightning. Além de configurá-lo, vamos aprender como operá-lo e mantê-lo ao longo do tempo.
+
+Existem muitas razões pelas quais você pode querer configurar seu próprio nó de Lightning. Alguns motivos incluem:
+
+* Ser um participante ativo e completo na Lightning Network, não apenas um usuário final
+* Para executar uma loja de comércio eletrônico ou receber renda por meio de pagamentos na Lightning
+* Para obter renda através de taxas de roteamento na Lightning ou alugando liquidez de canais
+* Para desenvolver novos serviços, aplicativos ou plug-ins para a Lightning Network
+* Para aumentar sua privacidade financeira ao usar a Lightning
+* Para usar alguns aplicativos desenvolvidos sobre a rede Lightning, como aplicativos de mensagens instantâneas que usam a tecnologia Lightning
+* Para liberdade financeira, independência e soberania
+
+Existem custos associados à execução de um nó LN. Você precisa de um computador, uma conexão à internet permanente, muito espaço em disco e muito tempo!
+Os custos operacionais incluirão despesas com eletricidade.
+
+Mas as habilidades que você aprenderá com essa experiência são valiosas e também podem ser aplicadas a uma variedade de outras tarefas.
+
+Vamos começar!
+
+[OBSERVAÇÃO]
+====
+É importante que você defina suas próprias expectativas com base em fatos precisos.
+Se você planeja operar um nó Lightning exclusivamente para obter renda através das taxas de roteamento,
+por favor, faça sua pesquisa diligentemente primeiro. Operar um negócio lucrativo através da operação de um nó Lightning
+definitivamente _não_ é fácil. Calcule todos os seus custos iniciais e contínuos em uma planilha. Estude cuidadosamente as estatísticas da LN.
+Qual é o volume atual de pagamentos? Qual é o volume por nó? Quais são as taxas médias de roteamento atuais? Consulte fóruns e peça
+conselhos ou feedback de outros membros da comunidade que já adquiriram experiência do mundo real. Forme sua própria opinião educada apenas 
+_depois_ de ter feito este exercício de devida diligência. A maioria das pessoas encontrará sua motivação para executar um nó não em ganho financeiro,
+mas em outro motivo.
+====
+
+=== Escolhendo Sua Plataforma
+
+((("Lightning node operation","choosing a platform", id="ix_05_node_operations-asciidoc1", range="startofrange")))Existem várias maneiras de executar um nó do Lightning, desde um pequeno mini PC hospedado em sua casa ou um servidor dedicado, até um servidor hospedado na nuvem. O método que você escolherá dependerá dos recursos que você possui e de quanto dinheiro está disposto a investir.
+
+[[continuous_operation]]
+==== Por Que a Confiabilidade é Importante para Executar um Nó Lightning?
+
+((("Lightning node operation","reliability issues")))((("reliability, Lightning node and")))No Bitcoin, o hardware não é especialmente importante, a menos que você esteja executando especificamente um nó de mineração.
+O software de nó Bitcoin Core pode ser executado em qualquer máquina que atenda aos requisitos mínimos e não precisa estar online para receber pagamentos—apenas para enviá-los.
+Se um nó Bitcoin ficar fora do ar por um período prolongado, o usuário pode simplesmente reiniciar o nó e, assim que ele se conectar ao restante da rede, ele irá sincronizar novamente a blockchain.
+
+No Lightning, no entanto, o usuário precisa estar online tanto para enviar _quanto_ para receber pagamentos. Se o nó Lightning estiver offline, ele não pode receber nenhum pagamento de ninguém e, portanto, suas faturas em aberto não podem ser pagas.
+Além disso, os canais abertos de um nó offline não podem ser usados para rotear pagamentos. Seus parceiros de canal perceberão que você está offline e não poderão contatá-lo para rotear um pagamento. Se você estiver offline com frequência, eles podem considerar que os bitcoin bloqueados em seus canais estão sendo subutilizados e podem fechar esses canais. Já discutimos o caso de um ataque de protocolo em que seu parceiro de canal tenta enganá-lo ao enviar uma transação de compromisso anterior. Se você estiver offline e seus canais não estiverem sendo monitorados, a tentativa de roubo pode ter sucesso e você não terá recursos uma vez que o timelock expire.
+Portanto, a confiabilidade do nó é extremamente importante para um nó Lightning.
+
+((("hardware failure")))Existem também as questões de falha de hardware e perda de dados. No Bitcoin, uma falha de hardware pode ser um problema trivial se o usuário tiver um backup de sua frase mnemônica ou chaves privadas. A carteira do Bitcoin e os bitcoin dentro da carteira podem ser facilmente restaurados a partir das chaves privadas em um novo computador. A maioria das informações pode ser baixada novamente a partir da blockchain..
+
+Em contraste, no Lightning, as informações sobre os canais do usuário, incluindo as transações de compromisso e os segredos de revogação, não são de conhecimento público e são armazenadas apenas no hardware do usuário individual.
+Portanto, falhas de software e hardware na Lightning Network podem facilmente resultar em perda de fundos.
+
+==== Tipos de Hardware de Nós Lightning
+
+((("Lightning node operation","types of hardware Lightning nodes")))Existem três tipos principais de nós de hardware para a Lightning Network:
+
+Computadores de propósito geral: Um nó LN pode ser executado em um computador doméstico ou laptop rodando Windows, macOS ou Linux. Geralmente é executado junto com um nó Bitcoin.
+Hardware dedicado:: Um nó Lightning também pode ser executado em hardware dedicado, como um Raspberry Pi, Rock64 ou mini PC. Essa configuração normalmente inclui uma pilha de software, incluindo um nó Bitcoin e outras aplicações. Essa configuração é popular porque o hardware é dedicado exclusivamente para executar e manter o nó Lightning, e geralmente é configurado com um "assistente" de instalação.
+Hardware pré-configurado:: Um nó LN também pode ser executado em hardware projetado especificamente para esse fim, selecionado e configurado para isso. Isso inclui soluções de nó Lightning "prontas para uso" que podem ser adquiridas como um kit ou um sistema turnkey.
+
+==== Executando na "Nuvem"
+
+((("cloud, Lightning node operation in")))((("Lightning node operation","running in the cloud")))((("virtual private server (VPS)")))_Servidores virtuais privados_ (VPS) e serviços de computação em nuvem, como Microsoft Azure, Google Cloud, Amazon Web Services (AWS) ou DigitalOcean, são bastante acessíveis e podem ser configurados rapidamente. Um nó Lightning pode ser hospedado por cerca de US$ 20 a US$ 40 por mês em um serviço desse tipo.
+
+No entanto, como diz o ditado, "&lsquo;Nuvem&rsquo; é apenas o computador de outra pessoa." Usar esses serviços significa executar seu nó em computadores de outras pessoas. Isso traz vantagens e desvantagens correspondentes. As principais vantagens são conveniência, eficiência, tempo de atividade e possivelmente até mesmo custo. O operador de nuvem gerencia e executa o nó em alto grau, fornecendo automaticamente conveniência e eficiência. Eles oferecem excelente tempo de atividade e disponibilidade, muitas vezes muito melhor do que o que um indivíduo pode alcançar em casa. Se considerarmos que apenas o custo de eletricidade de executar um servidor em muitos países ocidentais é de cerca de $ 10 por mês, somando a isso o custo de largura de banda de rede e o próprio hardware, a oferta de VPS se torna financeiramente competitiva. Por último, com um VPS, você não precisa de espaço para um PC em casa e não tem problemas com ruído ou calor do PC.
+Por outro lado, existem várias desvantagens importantes. Um nó Lightning em execução na "nuvem" sempre será menos seguro e menos privado do que um em execução em seu próprio computador. Além disso, esses serviços de computação em nuvem são muito centralizados. A grande maioria dos nós Bitcoin e Lightning em execução nesses serviços está localizada em um punhado de data centers em Virginia, Sunnyvale, Seattle, Londres e Frankfurt. Quando as redes ou data centers desses provedores têm problemas de serviço, isso afeta milhares de nós em redes supostamente "descentralizadas".
+
+Se você tiver a possibilidade e a capacidade de executar um nó em seu próprio computador em casa ou no escritório, essa pode ser uma opção preferível em relação à execução 
+na nuvem. No entanto, se executar seu próprio servidor não for uma opção, considere executar um em um VPS.
+
+==== Executando um Nó em Casa
+
+((("Lightning node operation","running a node at home")))Se você tiver uma conexão de internet com capacidade razoável em casa ou no escritório, certamente pode executar um nó Lightning lá. Qualquer conexão "banda larga" é suficiente para o propósito de executar um nó leve, e uma conexão rápida permitirá que você execute um nó completo do Bitcoin também.
+
+Embora você possa executar um nó Lightning (e até mesmo um nó Bitcoin) no seu laptop, isso se tornará irritante rapidamente. Esses programas consomem os recursos do seu computador e precisam ser executados 24 horas por dia, 7 dias por semana. Suas aplicações de usuário, como seu navegador ou sua planilha, competirão com os serviços em segundo plano do Lightning pelos recursos do seu computador. Em outras palavras, seu navegador e outras cargas de trabalho na área de trabalho serão desacelerados.
+E quando seu aplicativo de processamento de texto trava o seu laptop, o seu nó Lightning também ficará indisponível, impossibilitando o recebimento de transações e potencialmente deixando-o vulnerável a ataques. Além disso, você nunca deve desligar o seu laptop.
+Tudo isso combinado resulta em uma configuração que não é ideal. O mesmo se aplica ao seu desktop pessoal de uso diário.
+
+Em vez disso, a maioria dos usuários optará por executar um nó em um computador dedicado.
+Felizmente, você não precisa de um computador do tipo "servidor" para fazer isso.
+Você pode executar um nó Lightning em um computador de placa única, como um Raspberry Pi, ou em um mini PC (geralmente comercializado como PCs de home theater).
+Esses são computadores simples que são comumente usados como hub de automação residencial ou servidor de mídia.
+Eles são relativamente baratos quando comparados a um PC ou laptop.
+A vantagem de um dispositivo dedicado como plataforma para nós Lightning e Bitcoin é que ele pode funcionar continuamente, silenciosamente e sem interrupções em sua rede doméstica, escondido atrás do seu roteador ou da TV.
+Ninguém nem vai saber que essa pequena caixa faz parte de um sistema bancário global!
+
+[AVISO]
+====
+Operar um nó em um sistema operacional de 32 bits e/ou CPU de 32 bits não é recomendado, pois o software do nó pode enfrentar problemas de recursos, causando um travamento e possivelmente a perda de fundos.
+====
+
+==== Qual Hardware é Necessário para Executar um Nó do Lightning?
+
+((("hardware, Lightning node")))((("Lightning node operation","hardware requirements")))ara executar um nó Lightning, você precisará, no mínimo, dos seguintes requisitos:
+
+CPU:: É necessária capacidade de processamento suficiente para executar um nó Bitcoin, que irá baixar e validar continuamente novos blocos. O usuário também precisa considerar a inicialização do download de blocos (Initial Block Download, IBD) ao configurar um novo nó Bitcoin, o que pode levar de algumas horas a vários dias. Recomenda-se uma CPU de 2 núcleos ou 4 núcleos.
+
+RAM):: Um sistema com 2 GB de RAM irá _apenas_ executar os nós Bitcoin e Lightning de forma básica. Ele terá um desempenho muito melhor com pelo menos 4 GB de RAM. O IBD será especialmente desafiador com menos de 4 GB de RAM. Mais de 8 GB de RAM é desnecessário, pois a CPU é o maior gargalo para esses tipos de serviços, devido a operações criptográficas, como validação de assinaturas.
+
+Unidade de armazenamento:: Isso pode ser um disco rígido (HDD) ou um disco de estado sólido (SSD).
+Um SSD será significativamente mais rápido (mas mais caro) para executar um nó.
+A maior parte do armazenamento é usada para a blockchain do Bitcoin, que tem centenas de gigabytes de tamanho.
+Um compromisso justo (custo por complexidade) é comprar um pequeno SSD para inicializar o sistema operacional e um HDD maior para armazenar objetos de dados grandes (principalmente bancos de dados).
+
+[OBSERVAÇÃO]
+====
+Raspberry Pis são uma escolha comum para executar software de nó, devido ao custo e disponibilidade das peças.
+O sistema operacional que é executado no dispositivo geralmente é inicializado a partir de um cartão de memória Secure Digital (SD).
+Para a maioria dos casos de uso, isso não é um problema, mas o Bitcoin Core é conhecido por exigir muita entrada/saída (I/O).
+Você deve garantir que coloque a blockchain do Bitcoin e o diretório de dados do Lightning em uma unidade diferente, pois a intensa atividade de entrada/saída (I/O) a longo prazo pode causar falha no cartão SD.
+====
+
+Conexão com a internet:: Uma conexão de internet confiável é necessária para baixar novos blocos do Bitcoin, bem como para se comunicar com outros participantes da Lightning. Durante a operação, o uso estimado de dados varia de 10 a 100 GB por mês, dependendo da configuração. No início, um nó completo de Bitcoin faz o download da blockchain completa.
+
+Fonte de alimentação: É necessário ter uma fonte de alimentação confiável, pois os nós do Lightning precisam estar online o tempo todo. Uma falha de energia causará a interrupção de pagamentos em andamento. Para nós de roteamento de alto desempenho, é útil ter um backup ou um sistema de alimentação ininterrupta (UPS) em caso de quedas de energia.
+Idealmente, você deve conectar o roteador de internet a esse UPS também.
+
+Backup:: Backup é crucial porque uma falha pode resultar na perda de dados e, portanto, na perda de fundos.
+Você vai querer considerar algum tipo de solução de backup de dados. Isso pode ser um backup automatizado baseado em nuvem para um servidor ou serviço web que você controla. Alternativamente, pode ser um backup local automatizado em hardware, como um segundo disco rígido. Para obter melhores resultados, o backup local e remoto podem ser combinados.
+
+==== Alterando a Configuração do Servidor na Nuvem
+
+((("Lightning node operation","switching server configuration in the cloud")))Ao alugar um servidor na nuvem, muitas vezes é mais econômico alterar a configuração entre duas fases de operação. Uma CPU mais rápida e armazenamento mais rápido serão necessários durante a IBD (por exemplo, o primeiro dia). Após a sincronização da blockchain, os requisitos de desempenho da CPU e armazenamento são muito menores, portanto, o desempenho pode ser reduzido para um nível mais econômico.
+
+Por exemplo, na nuvem da Amazon, usaríamos um servidor com 8&ndash;16 GB RAM, CPU de 8 núcleos (por exemplo, t3-large ou m3.large) e um SSD mais rápido de 400 GB (com 1000+ operações de entrada/saída [IOPS] provisionadas) para o IBD, reduzindo seu tempo para apenas 6-8 horas. Uma vez concluída essa etapa, poderíamos trocar a instância do servidor por uma com 2 GB de RAM, CPU de 2 núcleos (por exemplo, t3.small) e armazenamento em um HDD geral de 1 TB. Isso custará aproximadamente o mesmo que se você o executasse no servidor mais lento o tempo todo, mas permitirá que você comece a operar em menos de um dia, em vez de ter que esperar quase uma semana pelo IBD.
+
+===== Armazenamento Permanente de Dados (drive)
+
+((("data storage")))((("Lightning node operation","permanent data storage")))Se você usa um mini PC ou aluga um servidor, o armazenamento pode ser a parte mais cara, custando tanto quanto o próprio computador e a conectividade (dados) juntos.
+
+Vamos dar uma olhada nas diferentes opções disponíveis. Primeiro, existem dois tipos principais de unidades de armazenamento, os HDDs e os SSDs. Os HDDs são mais baratos e os SSDs são mais rápidos, mas ambos são eficientes para o trabalho.
+
+((("Non-Volatile Memory Express (NVMe)")))((("solid state drives (SSDs)")))((("SSDs (solid state drives)")))Os SSDs mais rápidos disponíveis hoje em dia utilizam a interface Non-Volatile Memory Express (NVMe). Os SSDs NVMe são mais rápidos em máquinas de alto desempenho, mas também são mais caros.
+Os SSDs baseados em SATA tradicionais são mais baratos, mas não tão rápidos. Os SSDs SATA têm um desempenho suficientemente bom para a configuração do seu nó.
+Computadores menores podem não conseguir aproveitar os SSDs NVMe.
+Por exemplo, o Raspberry Pi 4 não pode se beneficiar deles devido à largura de banda limitada de sua porta USB.
+
+Para escolher o tamanho, vamos olhar para a blockchain do Bitcoin. Em agosto de 2021, seu tamanho é de 360 GB, incluindo o índice de transações, e cresce aproximadamente 60 GB por ano. Se você deseja ter uma margem disponível para o crescimento futuro ou para instalar outros dados em seu nó, adquira pelo menos um disco de 512 GB, ou ainda melhor, um disco de 1 TB.(((range="endofrange", startref="ix_05_node_operations-asciidoc1")))
+
+[[helpers]]
+=== Usando um Instalador ou Assistente
+
+((("helpers (installation/configuration software)", id="ix_05_node_operations-asciidoc2", range="startofrange")))((("Lightning node operation","using an installer or helper", id="ix_05_node_operations-asciidoc3", range="startofrange")))Instalar um nó Lightning ou um nó Bitcoin pode ser assustador se você não estiver familiarizado com um ambiente de linha de comando. Felizmente, existem vários projetos que fornecem "assistentes", ou seja, software que instala e configura os vários componentes para você. Ainda será necessário aprender alguns comandos de linha de comando para interagir com o seu nó, mas a maior parte do trabalho inicial é feita para você.
+
+==== RaspiBlitz
+
+((("helpers (installation/configuration software)","RaspiBlitz")))((("RaspiBlitz")))Um dos "assistentes" mais populares e completos é o _RaspiBlitz_. (<<RaspiBlitz>>), um projeto desenvolvido por Christian Rotzoll. É destinado a ser instalado em um Raspberry Pi 4. O RaspiBlitz vem com um kit de hardware recomendado que você pode montar em questão de horas ou no máximo um fim de semana. Se você participar de um "hackathon" da Lightning em sua cidade, é provável que veja muitas pessoas trabalhando em sua configuração do RaspiBlitz, trocando dicas e se ajudando mutuamente. Você pode encontrar o projeto RaspiBlitz em https://github.com/rootzoll/raspiblitz[GitHub].
+
+Além de um nó Bitcoin e Lightning, o RaspiBlitz pode instalar uma série de serviços adicionais, como:
+
+* Tor (executado como serviço oculto)
+* ElectRS (servidor Electrum em Rust)
+* BTCPay Server (processador de pagamentos em criptomoedas)
+* BTC RPC Explorer (explorador de blockchain Bitcoin)
+* Ride The Lightning (interface gráfica para gerenciamento de nó Lightning)
+* LNbits (sistema de carteira e contas Lightning)
+* Specter Desktop (multisig Trezor, Ledger, carteira Coldcard, and Specter-DIY)
+* lndmanage (interface de linha de comando para gerenciamento avançado de canais)
+* Loop (serviço de trocas submarinas)
+* JoinMarket (serviço CoinJoin)
+
+[[RaspiBlitz]]
+.Um nó RaspiBlitz
+image::images/mtln_0501.png[]
+
+==== Mynode
+
+((("helpers (installation/configuration software)","myNode")))((("myNode")))https://mynodebtc.com[_myNode_] é outro projeto de "assistente" de código aberto popular que inclui muitos softwares relacionados ao Bitcoin. É fácil de instalar: você "grava" o instalador em um cartão SD e inicializa seu mini PC a partir do cartão SD. Você não precisa de um monitor para usar o myNode, pois as ferramentas administrativas são acessíveis remotamente a partir de um navegador. Se o seu mini PC não tiver monitor, mouse ou teclado, você pode gerenciá-lo a partir de outro computador ou até mesmo do seu smartphone. Uma vez instalado, acesse http://mynode.local e crie uma carteira e um nó Lightning em apenas dois cliques.
+
+Além de um nó Bitcoin e Lightning, o myNode pode opcionalmente instalar uma variedade de serviços adicionais, como:
+
+* Ride The Lightning (interface gráfica para gerenciamento de nó Lightning)
+* OpenVPN (suporte a rede privada virtual [VPN] para gerenciamento remoto ou carteira)
+* lndmanage (interface de linha de comando para gerenciamento avançado de canais)
+* BTC RPC Explorer (um explorador de blockchain do Bitcoin)
+
+==== Umbrel
+
+((("helpers (installation/configuration software)","Umbrel", id="ix_05_node_operations-asciidoc4", range="startofrange")))((("Umbrel", id="ix_05_node_operations-asciidoc5", range="startofrange")))Famoso por sua UX/UI (mostrado em <<umbrel>>), _Umbrel_ oferece uma maneira fácil e acessível de configurar seu nó de Bitcoin e Lightning em pouco tempo, especialmente para iniciantes. Uma característica muito distintiva é que o Umbrel utiliza o Neutrino/SPV durante o IBD para que você possa começar a usar seu nó instantaneamente. Uma vez que o Bitcoin Core esteja totalmente sincronizado em segundo plano, ele muda automaticamente e desativa o modo SPV. O Umbrel OS suporta o Raspberry Pi 4 e também pode ser instalado em qualquer sistema operacional baseado em Linux ou em uma máquina virtual no macOS ou Windows. Você também pode conectar qualquer carteira que suporte Bitcoin Core P2P, Bitcoin Core RPC, o protocolo Electrum ou lndconnect.
+
+Não há necessidade de esperar por um dia chuvoso&mdash;você pode ir direto para https://getumbrel.com[Umbrel] para aprender mais.
+
+[[umbrel]]
+.A interface web do Umbrel
+image::images/mtln_0502.png["The Umbrel web interface"]
+
+Além de um nó Bitcoin e Lightning, o Umbrel introduziu a Umbrel App Store, onde você pode instalar facilmente serviços adicionais, como:
+
+* Terminal Lightning (interface para gerenciar a liquidez dos canais, Loop In, e Loop Out)
+* Ride The Lightning (interface gráfica para gerenciamento de nó Lightning)
+* Specter Desktop (coordenador observação-apenas para multisig e carteiras Bitcoin de chave única)
+* BTCPay Server (processador de pagamentos em criptomoedas)
+* BTC RPC Explorer (explorador de blockchain Bitcoin)
+* ThunderHub (monitorar e gerenciar seu nó)
+* Sphinx Relay (gerenciamento de conectividade e armazenamento para bate-papo com Sphinx)
+* mempool.space (visualizador da mempool e explorador de blocos)
+* LNbits (sistema de carteira e contas Lightning)
+
+Umbrel ainda está em fase beta e não é considerado seguro no momento.(((range="endofrange", startref="ix_05_node_operations-asciidoc5")))(((range="endofrange", startref="ix_05_node_operations-asciidoc4")))
+
+==== BTCPay Server
+
+((("BTCPay Server")))((("helpers (installation/configuration software)","BTCPay Server")))Embora não tenha sido inicialmente projetado como um "assistente" de instalação, a plataforma de comércio eletrônico e pagamento BTCPay Server possui um sistema de instalação incrivelmente fácil que utiliza contêineres Docker e +docker-compose+ para instalar um nó Bitcoin, nó Lightning e gateway de pagamento, entre muitos outros serviços. Ele pode ser instalado em várias plataformas de hardware, desde um simples Raspberry Pi 4 (recomendado 4 GB) até um mini PC, laptop antigo, desktop ou servidor.
+
+https://btcpayserver.org[BTCPay Server] é uma plataforma de comércio eletrônico totalmente equipada, auto-hospedada e com auto custódia que pode ser integrada a muitas plataformas de comércio eletrônico, como o WordPress WooCommerce e outros. A instalação do nó completo é apenas uma etapa da instalação da plataforma de comércio eletrônico.
+Embora originalmente desenvolvido como uma substituição de recurso por recurso do serviço de pagamento comercial _BitPay_ e sua API, ele evoluiu para se tornar uma plataforma completa para serviços BTC e Lightning relacionados ao comércio eletrônico. Para muitos vendedores ou lojas, é uma solução abrangente e pronta para uso no comércio eletrônico.
+
+Além de um nó Bitcoin e Lightning, o BTCPay Server também pode instalar uma variedade de serviços, incluindo:
+
+* `c-lightning` ou nó LND Lightning 
+* Suporte Litecoin
+* Suporte Monero
+* Spark server (carteira web `c-lightning`)
+* Charge server (API de comércio eletrônico `c-lightning`)
+* Ride The Lightning (interface gráfica web de gerenciamento de nó Lightning)
+* Muitos forks BTC
+* BTCTransmuter (serviço de automação evento-ação com suporte a troca de moedas)
+
+O número de serviços e recursos adicionais está crescendo rapidamente, então a lista anterior é apenas uma pequena amostra do que está disponível na plataforma BTCPay Server.
+
+==== Nó Bitcoin ou Lightning Leve
+
+((("Bitcoin node")))((("helpers (installation/configuration software)","Bitcoin node versus lightweight Lightning node")))Uma escolha crucial para a sua configuração será a escolha do nó Bitcoin e sua configuração. O _Bitcoin Core_, a implementação de referência, é a escolha mais comum, mas não a única disponível. Uma alternativa é o _btcd_, que é uma implementação em linguagem Go de um nó Bitcoin. O btcd suporta recursos que são úteis para executar um nó Lightning LND e não estão disponíveis no Bitcoin Core.
+
+Uma segunda consideração é se você executará um nó Bitcoin _arquivado_, com uma cópia completa da blockchain (cerca de 350 GB em meados de -2021) ou uma blockchain _podada_, que mantém apenas os blocos mais recentes. Uma blockchain podada pode economizar espaço em disco, mas você ainda precisará baixar a blockchain completa pelo menos uma vez (durante o IBD). Portanto, não economizará tráfego de rede. O uso de um nó podado para executar um nó Lightning ainda é uma capacidade experimental e pode não suportar todas as funcionalidades. No entanto, muitas pessoas estão executando um nó dessa maneira com sucesso.
+
+((("lightweight Lightning node")))Finalmente, você também tem a opção de não executar um nó Bitcoin. Em vez disso, você pode operar o nó LND Lightning no modo "leve", usando o Protocolo Neutrino para obter informações da blockchain de nós públicos Bitcoin operados por outros. Ao executar dessa maneira, você está utilizando recursos da rede Bitcoin sem oferecer nada em troca. Em vez disso, você está oferecendo seus recursos e contribuindo para a comunidade da LN. Para nós Lightning menores, isso geralmente reduz o tráfego de rede em comparação com a execução de um nó Bitcoin completo.
+
+Tenha em mente que operar um nó Bitcoin permite que você suporte outros serviços, além e em conjunto com um nó Lightning. Esses outros serviços podem exigir um nó Bitcoin arquivado (não podado) e muitas vezes não podem ser executados sem um nó Bitcoin. Considere antecipadamente quais outros serviços você pode querer executar agora ou no futuro para tomar uma decisão informada sobre o tipo de nó Bitcoin que você seleciona.
+
+A decisão final para essa escolha é a seguinte: se você pode arcar com um disco com capacidade superior a 500 GB, execute um nó Bitcoin arquivado completo. Você estará contribuindo com recursos para o sistema Bitcoin e ajudando outras pessoas que não têm condições de fazer o mesmo. Se você não pode arcar com um disco tão grande, execute um nó podado. Se você não pode arcar com o disco ou com a largura de banda nem mesmo para um nó podado, execute um nó leve do LND com o Neutrino.
+
+==== Escolha do Sistema Operacional
+
+((("Lightning node operation","operating system choice")))((("operating system","for Lightning node")))O próximo passo é selecionar um sistema operacional para o seu nó. A grande maioria dos servidores de internet roda em alguma variante do Linux. O Linux é a plataforma de escolha para a internet porque é um poderoso sistema operacional de código aberto. No entanto, o Linux possui uma curva de aprendizado íngreme e requer familiaridade com um ambiente de linha de comando. Muitas vezes, pode ser intimidante para novos usuários.
+
+Em última análise, a maioria dos serviços pode ser executada em qualquer sistema operacional moderno baseado em POSIX, o que inclui macOS, Windows e, é claro, Linux. Sua escolha deve ser baseada principalmente em sua familiaridade e conforto com um sistema operacional e em seus objetivos de aprendizado. Se você deseja expandir seus conhecimentos e aprender a operar um sistema Linux, esta é uma ótima oportunidade para fazê-lo com um projeto específico e um objetivo claro. Se você apenas deseja configurar um nó e colocá-lo em funcionamento, opte pelo que você já conhece.
+
+Atualmente, muitos serviços também são entregues na forma de contêineres, geralmente baseados no sistema Docker. Esses contêineres podem ser implantados em uma variedade de sistemas operacionais, abstraindo o sistema operacional subjacente. No entanto, você pode precisar aprender alguns comandos de linha de comando do Linux, pois a maioria dos contêineres roda alguma variante do Linux internamente.(((range="endofrange", startref="ix_05_node_operations-asciidoc3")))(((range="endofrange", startref="ix_05_node_operations-asciidoc2")))
+
+=== Escolha sua Implementação do Nó Lightning
+
+((("Lightning node operation","implementation choice")))Assim como a escolha do sistema operacional, a escolha da implementação do nó Lightning deve depender principalmente da sua familiaridade com a linguagem de programação e as ferramentas de desenvolvimento utilizadas pelos projetos. Embora haja algumas pequenas diferenças de recursos entre as várias implementações de nó, essas diferenças são relativamente pequenas, e a maioria das implementações converge para os padrões comuns definidos pelos BOLTs.
+
+A familiaridade com a linguagem de programação e o sistema de compilação, por outro lado, é uma boa base para escolher um nó. Isso ocorre porque a instalação, configuração, manutenção contínua e solução de problemas envolverão a interação com as várias ferramentas usadas pelo sistema de compilação. Isso inclui:
+
+* Make, Autotools, e utilidades GNU para `c-lightning`
+* Utilidades Go para LND
+* Java/Maven para Eclair
+
+A linguagem de programação influencia não apenas a escolha do sistema de compilação, mas também muitos outros aspectos do programa. Cada linguagem de programação possui uma filosofia de design e afeta muitos outros aspectos, como:
+
+* Formato e sintaxe dos arquivos de configuração
+* Localizações de arquivos (no sistema de arquivos)
+* Argumentos de linha de comando e sua sintaxe
+* Formatação da mensagem de erro
+* Bibliotecas de pré-requisito
+* Interfaces de chamada de procedimento remoto
+
+Ao escolher o seu nó Lightning, você também está escolhendo todas as características mencionadas anteriormente. Portanto, sua familiaridade com essas ferramentas e filosofias de design tornará mais fácil executar um nó. Ou mais difícil, se você estiver em um domínio desconhecido.
+
+Por outro lado, se esta for a sua primeira incursão no ambiente de linha de comando e em servidores/serviços, você se encontrará sem familiaridade com qualquer implementação e terá a oportunidade de aprender algo completamente novo. Nesse caso, você pode tomar sua decisão com base em uma série de outros fatores, como:
+
+* Qualidade dos fóruns de suporte e salas de bate-papo
+* Qualidade da documentação
+* Grau de integração com outras ferramentas que você deseja executar
+
+Como última consideração, você pode querer examinar o desempenho e a confiabilidade das diferentes implementações de nós. Isso é especialmente importante se você pretende utilizar esse nó em um ambiente de produção e espera um alto volume de tráfego e requisitos de alta confiabilidade. Isso pode ser o caso se você planeja executar o sistema de pagamentos de uma loja nele.
+
+=== Instalando nó Bitcoin ou Lightning
+
+((("Bitcoin node","installation/configuration", id="ix_05_node_operations-asciidoc6", range="startofrange")))((("Lightning node operation","installing Bitcoin node or Lightning node", id="ix_05_node_operations-asciidoc7", range="startofrange")))((("Linux, installing Bitcoin node or Lightning node", id="ix_05_node_operations-asciidoc8", range="startofrange")))Você decidiu não usar um "assistente" de instalação e, em vez disso, prefere se aventurar na linha de comando de um sistema operacional Linux? Essa é uma decisão corajosa e faremos o possível para ajudá-lo a fazer funcionar. Se você preferir não tentar fazer isso manualmente, considere usar um aplicativo que o auxilie na instalação do software do nó ou uma solução baseada em contêiner, conforme descrito em <<helpers>>.
+
+[AVISO]
+====
+Esta seção abordará o tópico avançado da administração do sistema a partir da linha de comando. A administração do Linux é uma habilidade própria que está fora do escopo deste livro. É um tópico complicado e há muitos desafios. Prossiga com cautela!
+====
+
+Nas próximas seções, descreveremos brevemente como instalar e configurar um nó Bitcoin e Lightning em um sistema operacional Linux. Você precisará revisar as instruções de instalação para os aplicativos de nó Bitcoin e Lightning específicos que você decidiu usar. Geralmente, você pode encontrá-las em um arquivo chamado _INSTALL_ ou no subdiretório _docs_ de cada projeto. Apenas descreveremos alguns dos passos comuns que se aplicam a todos esses serviços, e as instruções que ofereceremos serão necessariamente incompletas.
+
+==== Serviços em Segundo Plano
+
+((("background services")))((("Lightning node operation","background services")))Para aqueles acostumados a executar aplicativos em seu desktop ou smartphone, um aplicativo sempre possui uma interface gráfica, mesmo que às vezes seja executado em segundo plano. No entanto, os aplicativos de nó Bitcoin e Lightning são muito diferentes. Esses aplicativos não possuem uma interface gráfica incorporada. Em vez disso, eles são executados como serviços de plano de fundo _headless_, o que significa que estão sempre operando em segundo plano (in the background) e não interagem diretamente com o usuário.
+
+Isso pode criar alguma confusão para usuários que não estão acostumados a executar serviços em segundo plano. Como saber se um serviço está sendo executado? Como iniciar e parar o serviço? Como interagir com ele? As respostas a essas perguntas dependem do sistema operacional que você está usando. Por enquanto, vamos assumir que você está usando alguma variante do Linux e responderemos a essas perguntas nesse contexto.
+
+==== Isolamento do Processo
+
+((("Lightning node operation","process isolation")))Os serviços em segundo plano geralmente são executados sob uma conta de usuário específica para isolá-los do sistema operacional e entre si. Por exemplo, o Bitcoin Core é configurado para ser executado como usuário +bitcoin+. Você precisará usar a linha de comando para criar um usuário para cada um dos serviços que você executar.
+
+Além disso, se você conectou uma unidade externa, precisará informar ao sistema operacional para realocar o diretório principal do usuário para essa unidade. Isso ocorre porque um serviço como o Bitcoin Core criará arquivos sob o diretório principal (home) do usuário. Se você estiver configurando-o para baixar toda a blockchain do Bitcoin, esses arquivos ocuparão várias centenas de gigabytes. Aqui, assumimos que você conectou a unidade externa e ela está localizada no caminho _/external_drive/_ do sistema operacional.
+
+Na maioria dos sistemas Linux, você pode criar um novo usuário com o comando +useradd+, da seguinte maneira:
+
+----
+$ sudo useradd -m -d /external_drive/bitcoin -s /dev/null bitcoin
+----
+
+As flags +m+ e +d+ criam o diretório home do usuário conforme especificado por _/external_drive/bitcoin_ neste caso. A flag +s+ atribui o shell interativo do usuário. Neste caso, definimos como _/dev/null_ para desabilitar o uso do shell interativo. O último argumento é o nome de usuário do novo usuário, +bitcoin+.
+
+==== Inicialização do Nó
+
+((("Lightning node operation","node startup")))((("startup script")))Tanto para os serviços do nó Bitcoin quanto do Lightning, a "instalação" também envolve a criação de um chamado _script de inicialização_ para garantir que o nó seja iniciado quando o computador é ligado. A inicialização e desligamento de serviços em segundo plano são tratados por um processo do sistema operacional, que no Linux é chamado de +init+ ou +systemd+. Geralmente, é possível encontrar um script de inicialização do sistema no subdiretório +contrib+ de cada projeto. Por exemplo, se você estiver em um sistema operacional Linux moderno que utiliza +systemd+, encontrará um script chamado _bitcoind.service_ que pode iniciar e parar o serviço do nó Bitcoin Core.
+
+Aqui está um exemplo de como se parece um script de inicialização de um nó Bitcoin, retirado do repositório de código do Bitcoin Core:
+
+.From bitcoin/contrib/init/bitcoind.service
+----
+[Unit]
+Description=Bitcoin daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/bitcoind -daemon \
+                            -pid=/run/bitcoind/bitcoind.pid \
+                            -conf=/etc/bitcoin/bitcoin.conf \
+                            -datadir=/var/lib/bitcoind
+
+# Make sure the config directory is readable by the service user
+PermissionsStartOnly=true
+ExecStartPre=/bin/chgrp bitcoin /etc/bitcoin
+
+# Process management
+####################
+
+Type=forking
+PIDFile=/run/bitcoind/bitcoind.pid
+Restart=on-failure
+TimeoutStopSec=600
+
+# Directory creation and permissions
+####################################
+
+# Run as bitcoin:bitcoin
+User=bitcoin
+Group=bitcoin
+
+# /run/bitcoind
+RuntimeDirectory=bitcoind
+RuntimeDirectoryMode=0710
+
+# /etc/bitcoin
+ConfigurationDirectory=bitcoin
+ConfigurationDirectoryMode=0710
+
+# /var/lib/bitcoind
+StateDirectory=bitcoind
+StateDirectoryMode=0710
+
+[...]
+
+[Install]
+WantedBy=multi-user.target
+----
+
+Como usuário root, instale o script copiando-o para a pasta de serviço do +systemd+ em /lib/systemd/system/, e em seguida recarregue o +systemd+:
+
+----
+$ sudo systemctl daemon-reload
+----
+
+[role="pagebreak-before"]
+Em seguida, habilite o serviço:
+
+----
+$ sudo systemctl enable bitcoind
+----
+
+Agora você pode iniciar e parar o serviço. Não inicie ainda, pois não configuramos o nó Bitcoin.
+
+----
+$ sudo systemctl start bitcoind
+$ sudo systemctl stop bitcoind
+----
+
+==== Configuração do Nó
+
+((("Lightning node operation","node configuration")))Para configurar seu nó, você precisa criar e fazer referência a um arquivo de configuração. Por convenção, esse arquivo geralmente é criado em _/etc_, sob um diretório com o nome do programa. Por exemplo, as configurações do Bitcoin Core e do LND normalmente são armazenadas em _/etc/bitcoin/bitcoin.conf_ e 
+_/etc/lnd/lnd.conf_, respectivamente.
+
+Esses arquivos de configuração são arquivos de texto nos quais cada linha expressa uma opção de configuração e seu valor. Valores padrão são assumidos para qualquer coisa que não esteja definida no arquivo de configuração. Você pode ver quais opções podem ser definidas na configuração de duas maneiras. Primeiro, executar o aplicativo do nó com o argumento +help+ mostrará as opções que podem ser definidas na linha de comando. Essas mesmas opções podem ser definidas no arquivo de configuração. Segundo, você geralmente pode encontrar um exemplo de arquivo de configuração, com todas as opções padrão, no repositório de código do software.
+
+Você pode encontrar um exemplo de arquivo de configuração em cada uma das imagens Docker que usamos no <<set_up_a_lightning_node>>. Por exemplo, o arquivo _code/docker/bitcoind/bitcoind/bitcoin.conf_:
+
+.Configuration file for docker bitcoind (code/docker/bitcoind/bitcoind/bitcoin.conf)
+----
+include::code/docker/bitcoind/bitcoind/bitcoin.conf[]
+----
+
+A configuração desse arquivo em particular configura o Bitcoin Core para operar como um nó +regtest+ e fornece um nome de usuário e senha fracos para acesso remoto, portanto, você não deve usá-lo para a configuração do seu nó. No entanto, ele serve para ilustrar a sintaxe de um arquivo de configuração e você pode fazer ajustes nele no contêiner Docker para experimentar diferentes opções. Veja se você consegue usar o comando +bitcoind -help+ para entender o que cada uma das opções faz no contexto da rede Docker que construímos no <<set_up_a_lightning_node>>.
+
+Frequentemente, os valores padrão são suficientes e, com algumas modificações, o software do seu nó pode ser configurado rapidamente. Para iniciar um nó do Bitcoin Core com personalização mínima, você só precisa de quatro linhas de configuração:
+
+[source, subs="quotes"]
+----
+server=1
+daemon=1
+txindex=1
+rpcuser=_USERNAME_
+rpcpassword=_PASSWORD_
+----
+
+Mesmo a opção +txindex+ não é estritamente necessária, embora ela garanta que o nó do Bitcoin crie um índice de todas as transações, o que é necessário para algumas aplicações. A opção +txindex+ não é necessária para executar um nó Lightning.
+
+Um nó Lightning `c-lightning` executado no mesmo servidor também requer apenas algumas linhas na configuração:
+
+[source, subs="quotes"]
+----
+network=mainnet
+bitcoin-rpcuser=_USERNAME_
+bitcoin-rpcpassword=_PASSWORD_
+----
+
+Em geral, é uma boa ideia minimizar a quantidade de personalização desses sistemas. A configuração padrão é cuidadosamente projetada para suportar as implantações mais comuns. Se você modificar um valor padrão, isso pode causar problemas posteriormente ou reduzir o desempenho do seu nó. Em resumo, faça modificações apenas quando necessário!
+
+==== Configuração de Rede
+
+((("Lightning node operation","network configuration", id="ix_05_node_operations-asciidoc9", range="startofrange")))((("network configuration","Lightning node", id="ix_05_node_operations-asciidoc10", range="startofrange")))A configuração de rede geralmente não é um problema ao configurar um novo aplicativo. No entanto, redes ponto a ponto como o Bitcoin e a Lightning Network apresentam alguns desafios únicos para a configuração de rede.
+
+Em um serviço centralizado, o seu computador se conecta aos "grandes servidores" de uma empresa, e não o contrário. A sua conexão de internet residencial é configurada com a suposição de que você é apenas um consumidor de serviços fornecidos por outros. Mas em um sistema ponto a ponto, cada nó tanto consome como fornece serviços para outros nós. Se você está executando um nó de Bitcoin ou Lightning em sua casa, você está fornecendo um serviço para outros computadores na internet. O seu serviço de internet, por padrão, não está configurado para permitir que você execute servidores e pode precisar de alguma configuração adicional para permitir que outros acessem o seu nó.
+
+Se você deseja executar um nó de Bitcoin ou Lightning, é necessário permitir que outros nós na internet se conectem a você. Isso significa habilitar conexões TCP de entrada para a porta do Bitcoin (porta 8333 por padrão) ou a porta do Lightning (porta 9735 por padrão). Embora seja possível executar um nó de Bitcoin sem conectividade de entrada, isso não é possível com um nó de Lightning. Um nó de Lightning deve ser acessível para outros de fora da sua rede.
+
+Por padrão, o roteador de internet residencial não espera conexões de entrada do exterior e, na verdade, bloqueia essas conexões. O endereço IP do seu roteador de internet é o único endereço IP acessível externamente, e todos os computadores que você executa dentro da rede doméstica compartilham esse único endereço IP. Isso é alcançado por meio de um mecanismo chamado _Tradução de Endereços de Rede_ (Network Address Translation, _NAT_), que permite que o roteador de internet atue como intermediário para todas as conexões de saída. ((("port forwarding","defined")))Se você deseja permitir uma conexão de entrada, você precisa configurar o _encaminhamento de porta_ (port forwarding), que informa ao seu roteador de internet que as conexões de entrada em portas específicas devem ser encaminhadas para computadores específicos dentro da rede. Isso pode ser feito manualmente, alterando a configuração do seu roteador de internet, ou, se o seu roteador suportar, por meio de um mecanismo automático de encaminhamento de porta chamado _Universal Plug and Play_ (_UPnP_).
+
+Um mecanismo alternativo ao encaminhamento de porta é habilitar o The Onion Router (Tor), que fornece uma espécie de rede virtual privada sobreposta que permite conexões de entrada a um _endereço onion_. Se você executar o Tor, não será necessário fazer o encaminhamento de porta ou permitir conexões de entrada nas portas do Bitcoin ou do Lightning. Se você executar seus nós usando o Tor, todo o tráfego passará pelo Tor e nenhuma outra porta será usada.
+
+Vamos analisar diferentes maneiras pelas quais você pode permitir que outras pessoas se conectem ao seu nó. Vamos abordar essas alternativas em ordem, do mais fácil ao mais difícil.
+
+===== Simplesmente funciona!
+
+Existe a possibilidade de que seu provedor de serviços de Internet ou roteador esteja configurado para suportar UPnP por padrão e tudo funcione automaticamente. Vamos tentar essa abordagem primeiro, caso tenhamos sorte.
+
+Supondo que você já tenha um nó Bitcoin ou Lightning em execução, vamos verificar se eles são acessíveis externamente.
+
+[OBSERVAÇÃO]
+====
+Para que esse teste funcione, você precisa ter um nó Bitcoin ou Lightning (ou ambos) em execução em sua rede doméstica. Se o seu roteador suporta UPnP, o tráfego de entrada será automaticamente encaminhado para as portas correspondentes no computador que está executando o nó.
+====
+
+Você pode usar alguns sites muito populares e úteis para descobrir qual é o seu endereço IP externo e se ele permite e encaminha conexões de entrada para uma porta conhecida. Aqui estão dois sites confiáveis:
+
+* https://canyouseeme.org[]
+* https://www.whatismyip.com/port-scanner[]
+
+Por padrão, esses serviços permitem que você verifique apenas as conexões de entrada para o endereço IP a partir do qual você está conectado. Isso é feito para evitar que você use o serviço para escanear redes e computadores de outras pessoas. Você verá o endereço IP externo do seu roteador e um campo para inserir um número de porta. Se você não alterou as portas padrão na configuração do seu nó, tente a porta 8333 (Bitcoin) e/ou 9735 (Lightning).
+
+Na <<ln_port_check>> você pode ver o resultado da verificação da porta 9735 em um servidor executando a Lightning usando a ferramenta de verificação de porta do _whatismyip.com_. Ela mostra que o servidor está aceitando conexões de entrada na porta da Lightning. Se você ver um resultado assim, está tudo pronto!
+
+[[ln_port_check]]
+.Verificando a porta de entrada 9735
+image::images/mtln_0503.png[]
+
+===== Encaminhamento de porta automático usando UPnP
+
+((("network configuration","automatic port forwarding using UPnP")))((("port forwarding","automatic")))((("Universal Plug and Play (UPnP)")))Às vezes, mesmo que o seu roteador de internet suporte UPnP, ele pode estar desativado por padrão. Nesse caso, você precisa alterar a configuração do seu roteador de internet por meio da interface de administração web:
+
+. Conecte-se ao site de configuração do roteador de internet. Normalmente, isso pode ser feito conectando-se ao _endereço de gateway_ da sua rede doméstica usando um navegador da web. Você pode encontrar o endereço de gateway verificando a configuração IP de qualquer computador na sua rede doméstica. Geralmente, é o primeiro endereço em uma das redes não roteáveis, como 192.168.0.1 ou 10.0.0.1. Verifique também todos os adesivos no seu roteador para encontrar o _gateway address_. Uma vez encontrado, abra um navegador e insira o endereço IP na barra de URL/Pesquisa do navegador, por exemplo, "192.168.0.1" ou "http://192.168.0.1."
+
+. Encontre o nome de usuário e senha do administrador para o painel de configuração web do roteador. Isso geralmente está escrito em um adesivo no próprio roteador e pode ser tão simples como "admin" e "senha". Uma rápida pesquisa na web pelo seu provedor de serviços de internet (ISP) e modelo do roteador também pode ajudar a encontrar essas informações.
+
+. Encontre uma opção para UPnP e ative-a.
+
+Reinicie seu nó Bitcoin e/ou Lightning e repita o teste de porta aberta com um dos sites que usamos na seção anterior.
+
+======= Usando o Tor para conexões de entrada
+
+((("network configuration","Tor for incoming connections")))((("The Onion Router (Tor)")))((("Tor (The Onion Router)")))O _The Onion Router_ (_Tor_) é uma VPN com a propriedade especial de criptografar as comunicações entre os nós intermediários, de modo que qualquer nó intermediário não possa determinar a origem ou o destino de um pacote. Tanto os nós Bitcoin quanto os nós Lightning suportam a operação sobre o Tor, o que permite que você opere um nó sem revelar seu endereço IP ou localização. Portanto, ele fornece um alto nível de privacidade para o tráfego da sua rede. Uma vantagem adicional de executar o Tor é que, porque ele opera como uma VPN, resolve o problema de encaminhamento de porta do seu roteador de internet. As conexões de entrada são recebidas através do túnel do Tor, e seu nó pode ser encontrado por meio de um _endereço onion_ gerado para essa função, em vez de um endereço IP.
+
+Para habilitar o Tor, são necessários dois passos. Primeiro, você precisa instalar o roteador e o proxy Tor em seu computador. Segundo, você precisa habilitar o uso do proxy Tor em sua configuração do Bitcoin ou Lightning.
+
+Para instalar o Tor em um sistema Ubuntu Linux que utiliza o gerenciador de pacotes +apt+, execute o seguinte comando:
+
+----
+sudo apt install tor
+----
+
+Em seguida, configuramos nosso nó Lightning para usar o Tor para conectividade externa. Aqui está um exemplo de configuração para o LND:
+
+----
+[Tor]
+tor.active=true
+tor.v3=true
+tor.streamisolation=true
+listen=localhost
+----
+
+Isso ativará o Tor (+tor.active+), estabelecerá um serviço onion v3 (+tor.v3=true+), usará um fluxo onion diferente para cada conexão (+tor.streamisolation+) e restringirá a escuta de conexões apenas para o host local, para evitar vazamento do seu endereço IP (pass:[<code>l&#x2060;i&#x2060;s&#x2060;t&#x2060;e&#x2060;n&#x200b;=&#x2060;l&#x2060;o&#x2060;c&#x2060;a&#x2060;l&#x2060;h&#x2060;o&#x2060;s&#x2060;t</code>]).
+
+Você pode verificar se o Tor está corretamente instalado e funcionando executando um simples comando de uma linha. Este comando deve funcionar na maioria das distribuições Linux:
+
+----
+curl --socks5 localhost:9050 --socks5-hostname localhost:9050 -s https://check.torproject.org/ | cat | grep -m 1 Congratulations | xargs
+----
+
+Se tudo está funcionando corretamente, a resposta para esse comando deve ser +"Congratulations. This browser is configured to use Tor."+
+
+Devido à natureza do Tor, não é fácil usar um serviço externo para verificar se o seu nó é acessível através de um endereço onion. No entanto, você deve ver o seu endereço onion do Tor nos registros (logs) do seu nó Lightning. É uma sequência longa de letras e números seguida do sufixo +.onion+. Agora o seu nó deve ser acessível a partir da internet, com a vantagem adicional de privacidade!
+
+===== Encaminhamento manual de porta 
+
+((("network configuration","manual port forwarding")))((("port forwarding","manual")))Esse é o processo mais complexo e requer habilidades técnicas avançadas. Os detalhes dependem do tipo de roteador de internet que você possui, das configurações e políticas do seu provedor de serviços e de muitos outros contextos. Tente primeiro o UPnP ou o Tor, antes de tentar esse mecanismo muito mais difícil.
+
+Os passos básicos são os seguintes:
+
+. Encontre o endereço IP do computador onde o seu nó está localizado. Isso geralmente é alocado dinamicamente pelo Protocolo de Configuração Dinâmica de Hosts (DHCP) e costuma estar em algum lugar do intervalo 192.168.x.x ou 10.x.x.x.
+
+. Encontre o endereço de controle de acesso à mídia (MAC) da interface de rede do seu nó. Isso pode ser encontrado nas configurações de internet desse computador.
+
+. Atribua um endereço IP estático para o seu nó, para que ele seja sempre o mesmo. Você pode usar o endereço IP que ele possui atualmente. No seu roteador de internet, procure por "Static Leases" nas configurações de DHCP. Associe o endereço MAC ao endereço IP selecionado. Agora, o seu nó sempre terá esse endereço IP alocado. Alternativamente, você pode verificar a configuração de DHCP do seu roteador e descobrir qual é o intervalo de endereços DHCP. Selecione um endereço não utilizado _fora_ do intervalo de endereços DHCP. Em seguida, no servidor, configure a rede para parar de usar o DHCP e defina o endereço IP selecionado, que não é obtido por DHCP, na configuração de rede do sistema operacional.
+
+. Por fim, configure o "Redirecionamento de Portas" (Port Forwarding) no seu roteador de internet para encaminhar o tráfego de entrada em portas específicas para o endereço IP selecionado do seu servidor.
+
+Assim que terminar de reconfigurar, repita a verificação de portas usando um dos sites das seções anteriores(((range="endofrange", startref="ix_05_node_operations-asciidoc10")))(((range="endofrange", startref="ix_05_node_operations-asciidoc9"))).(((range="endofrange", startref="ix_05_node_operations-asciidoc8")))(((range="endofrange", startref="ix_05_node_operations-asciidoc7")))(((range="endofrange", startref="ix_05_node_operations-asciidoc6")))
+
+=== Segurança do Seu Nó
+
+((("Lightning node operation","security", id="ix_05_node_operations-asciidoc11", range="startofrange")))((("security and privacy","Lightning node", id="ix_05_node_operations-asciidoc12", range="startofrange")))Um nó Lightning é, por definição, uma _hot wallet_ (carteira quente). Isso significa que os fundos (tanto na cadeia principal quanto fora da cadeia, on-chain e off-chain) controlados por um nó Lightning são diretamente controlados pelas chaves que estão carregadas na memória do nó ou armazenadas no disco rígido do nó. Se um nó Lightning for comprometido, é trivial criar transações na cadeia principal ou fora da cadeia para esvaziar seus fundos. Portanto, é extremamente importante protegê-lo contra acesso não autorizado.
+
+A segurança é um esforço holístico, o que significa que você precisa garantir a segurança em todas as camadas de um sistema. Como diz o ditado: a corrente é tão forte quanto o seu elo mais fraco. Esse é um conceito importante na segurança da informação e aplicaremos isso ao nosso nó.
+
+Apesar de todas as medidas de segurança que você adotará, lembre-se de que a Lightning Network é uma tecnologia experimental em estágio inicial e é provável que haja bugs no código de qualquer projeto que você use. _Não coloque mais dinheiro do que está disposto a arriscar perder na Lightning Network._
+
+
+==== Segurança do Sistema Operacional
+
+((("operating system","security")))((("security and privacy","operating system security")))Assegurar um sistema operacional é um tópico amplo que está além do escopo deste livro. No entanto, podemos estabelecer alguns princípios básicos.
+
+Para garantir a segurança do seu sistema operacional, aqui estão alguns dos principais itens a serem considerados:
+
+Procedência:: Comece garantindo que você esteja baixando a imagem correta do sistema operacional e verifique as assinaturas ou checksums antes de instalá-lo. Estenda isso para qualquer software que você instalar. Verifique duas vezes a origem ou URL de onde você faz o download. Verifique a integridade e a correção do software baixado por meio da verificação de assinaturas e checksums.
+Manutenção:: Certifique-se de manter seu sistema operacional atualizado. Habilite a instalação automatizada de atualizações de segurança diariamente ou semanalmente.
+Privilégio mínimo:: configure usuários para processos específicos e conceda a eles o menor acesso necessário para executar um serviço. Não execute processos com privilégios de administrador (por exemplo, +root+).
+Isolamento de processos:: Use as funcionalidades do sistema operacional para isolar os processos uns dos outros.
+Permissões do sistema de arquivos:: Configure cuidadosamente o sistema de arquivos, seguindo o princípio do menor privilégio. Não permita que arquivos sejam lidos ou alteráveis por todos.
+Autenticação forte:: Use senhas fortes geradas aleatoriamente ou, sempre que possível, autenticação por chave pública. Por exemplo, é mais seguro usar o Secure Shell (SSH) com um par de chaves criptográficas em vez de uma senha.
+Autenticação de dois fatores (2FA):: Use a autenticação de dois fatores sempre que possível, incluindo o Universal 2nd Factor (U2F) com chaves de segurança físicas. Isso se aplica a todos os serviços externos que você possa estar usando, como o seu provedor de serviços em nuvem. Você também pode aplicar isso à sua própria configuração, como a sua própria configuração do SSH. Use a 2FA também para serviços indiretos. Por exemplo, digamos que você esteja usando um serviço em nuvem. Você forneceu ao seu provedor de serviços em nuvem um endereço de e-mail, portanto, você também deve proteger seu endereço de e-mail com 2FA.
+Backup: Faça backups do seu sistema e certifique-se de proteger os backups com criptografia também. Realize esses backups periodicamente. Pelo menos uma vez, teste se você consegue restaurar seu backup e se o backup está completo e acessível. Se possível, mantenha uma cópia dos backups em um disco diferente para evitar que uma falha em um único disco rígido destrua _tanto_ seu nó ativo quanto suas cópias de backup.
+Gerenciamento de vulnerabilidades e exposição: Use varreduras remotas para garantir que você tenha minimizado a superfície de ataque do seu sistema. Feche quaisquer serviços ou portas desnecessárias. Instale apenas software e pacotes que você realmente precisa e usa. Desinstale pacotes que você não utiliza mais. É recomendado que você _não_ utilize seu computador de nó para atividades não relacionadas ao nó que você pode realizar em outro computador. Especialmente, se possível, _não_ use seu computador de nó para navegar, acessar a internet ou ler seus e-mails.
+
+Esta é uma lista das medidas de segurança mais básicas. Ela não é de forma alguma exaustiva.
+
+==== Acesso ao Nó
+
+((("Lightning node operation","node access")))((("remote procedure call (RPC) API")))((("RPC (remote procedure call) API")))O seu nó Lightning expõe uma API de chamada de procedimento remoto (RPC). Isso significa que o seu nó pode ser controlado remotamente por comandos enviados para uma porta TCP específica. O controle de acesso a essa API RPC é feito por meio de autenticação do usuário. Dependendo do tipo de nó Lightning que você configurou, isso pode ser feito por pass:[<span class="keep-together">username/password</span>] autenticação ou por um mecanismo chamado de _macaroon_ de autenticação. Como o nome sugere, um macaroon é um tipo mais sofisticado de cookie. Ao contrário de um cookie, ele é assinado criptograficamente e pode expressar um conjunto de permissões pass:[<span class="keep-together">de acesso</span>].
+
+Por exemplo, o LND usa macaroons para conceder acesso à API RPC. Por padrão, o software LND cria três macaroons com diferentes níveis de acesso, chamados +admin+, +invoice+ e +readonly+. Dependendo de qual macaroon você copiar e usar no seu cliente RPC, você terá acesso apenas para leitura (_read-only_), acesso para criação de _faturas_ (que inclui as capacidades de leitura) ou acesso de _administrador_, que oferece controle total. Há também uma função de macaroon +bakery+ no LND que pode construir macaroons com qualquer combinação de capacidades com controle muito preciso.
+
+Se você estiver usando um modelo de autenticação de nome de usuário/senha, certifique-se de escolher uma senha longa e aleatória. Você não precisará digitar essa senha com frequência, pois ela será armazenada nos arquivos de configuração. Portanto, escolha uma senha que não possa ser adivinhada. Muitos dos exemplos que você encontrará incluem senhas mal escolhidas, e muitas vezes as pessoas as copiam em seus próprios sistemas, fornecendo fácil acesso para qualquer pessoa. Não faça isso! Use um gerenciador de senhas para gerar uma senha alfanumérica longa e aleatória. Como certos caracteres especiais, como +$?/!*\&%`"'+, podem interferir na linha de comando, é melhor evitá-los para senhas que serão usadas em um ambiente de shell. Para evitar problemas, opte por senhas alfanuméricas longas e aleatórias.
+
+Uma sequência alfanumérica simples que tenha mais de 12 caracteres e seja gerada aleatoriamente geralmente é suficiente. Se você planeja armazenar grandes quantias de dinheiro em seu nó Lightning e está preocupado com ataques de força bruta remotos, selecione uma senha com mais de 20 caracteres para tornar esses ataques praticamente inviáveis.(((range="endofrange", startref="ix_05_node_operations-asciidoc12")))(((range="endofrange", startref="ix_05_node_operations-asciidoc11")))
+
+=== Backups de Nós e Canais
+
+((("backups", id="ix_05_node_operations-asciidoc13", range="startofrange")))((("Lightning Network channels","backups", id="ix_05_node_operations-asciidoc14", range="startofrange")))((("Lightning node operation","node and channel backups", id="ix_05_node_operations-asciidoc15", range="startofrange")))Uma consideração muito importante ao executar um nó Lightning é a questão dos backups. Ao contrário de uma carteira Bitcoin, onde uma frase mnemônica BIP-39 pode recuperar todo o estado da carteira, na Lightning isso _não_ é o caso.
+
+As carteiras da Lightning utilizam uma frase mnemônica BIP-39 para o backup, mas somente da carteira on-chain. No entanto, devido à forma como os canais são construídos, a frase mnemônica _não_ é suficiente para restaurar um nó Lightning. ((("SCB (static channel backup)")))((("static channel backup (SCB)")))É necessária uma camada adicional de backups, chamada de _static channel backup_ (_SCB_). Sem um SCB, um operador de nó Lightning pode perder _todos_ os fundos que estão nos canais caso perca o armazenamento de dados do nó Lightning.
+
+[AVISO]
+====
+_Não_ financie canais até ter um sistema para fazer backups contínuos do estado dos seus canais. Seus backups devem ser movidos para um local "externo", em um sistema e localização diferentes do seu nó, de modo que possam sobreviver a uma variedade de falhas do sistema (perda de energia, corrupção de dados etc.) ou desastres naturais (inundações, incêndios etc.).
+====
+
+SCBs não são uma solução perfeita. Primeiro, o estado de cada canal precisa ser copiado (backed up) a cada nova transação de compromisso. Segundo, restaurar a partir de um backup de canal é perigoso. Se você não tiver a transação de compromisso _mais recente_ e acidentalmente transmitir uma transação de compromisso antiga (revogada), seu par de canal assumirá que você está tentando trapacear e reivindicará todo o saldo do canal com uma transação de penalidade. Para garantir que você esteja fechando o canal, você precisa realizar um _fechamento cooperativo_. Mas um par malicioso poderia enganar o seu nó para transmitir um compromisso antigo e revogado durante esse fechamento cooperativo, enganando você fazendo com que seu nó tente trapacear inadvertidamente.
+
+Além disso, os backups dos seus canais precisam ser criptografados para manter sua privacidade e segurança dos canais. Caso contrário, qualquer pessoa que encontre os backups poderá não apenas ver todos os seus canais, mas também poderia usar os backups para fechar todos os seus canais de uma maneira que transfere o saldo para seus pares de canal. Em outras palavras, uma pessoa maliciosa que tenha acesso aos seus backups pode fazer com que você perca todos os fundos dos seus canais.
+
+Você pode ver que os SCBs não são uma proteção infalível. Eles são um compromisso fraco, pois trocam um tipo de risco (corrupção ou perda de dados) por outro tipo de risco (pares maliciosos). Para restaurar a partir de um SCB, você precisa interagir com seus pares de canal e torcer para que eles não tentem enganá-lo, fornecendo um compromisso antigo ou enganando seu nó para transmitir um compromisso revogado, para que possam penalizá-lo. Apesar das fraquezas dos SCBs, eles fazem sentido e você deve realizá-los. Se você não fizer os SCBs e perder os dados do seu nó, perderá os fundos dos seus canais para sempre. Garantido! No entanto, se você _fizer_ os SCBs e perder os dados do seu nó, então você tem uma chance razoável de que alguns dos seus pares sejam honestos e que você possa recuperar alguns dos seus fundos de canal. Se tiver sorte, talvez você consiga recuperar todos os seus fundos. Em conclusão, é melhor realizar SCBs contínuos em um disco diferente do disco rígido principal do nó.
+
+Mecanismos de backup de canais ainda estão em desenvolvimento e são uma fraqueza na maioria das implementações do Lightning.
+
+((("Lightning Network Daemon (LND) node project","SCBs and")))No momento em que este livro foi escrito, apenas o LND oferece um mecanismo embutido para SCBs. O Eclair tem um mecanismo semelhante implementado para implantações do lado do servidor, embora o Eclair Mobile ofereça backup opcional para o Google Drive. O `c-lightning` recentemente incorporou as interfaces necessárias para um plug-in implementar backups de canais. Infelizmente, não há um mecanismo de backup consistente e acordado entre diferentes implementações pass:[<span class="keep-together">de nós</span>].
+
+Os backups baseados em arquivos dos bancos de dados dos nós Lightning são, no máximo, uma solução parcial, pois você corre o risco de fazer o backup de um estado inconsistente do banco de dados. Além disso, você pode não capturar de forma confiável os compromissos de estado mais recentes. É muito melhor ter um mecanismo de backup que seja acionado sempre que houver uma alteração de estado em um canal, garantindo assim a consistência dos dados.
+
+Para configurar SCBs no LND, defina o parâmetro +backupfilepath+ na linha de comando ou no arquivo de configuração. O LND salvará então um arquivo SCB nesse diretório. No entanto, isso é apenas o primeiro passo da solução. Agora você precisa configurar um mecanismo que monitore esse arquivo em busca de alterações. Cada vez que o arquivo é alterado, pass:[<span class="keep-together">o mecanismo</span>] de backup deve copiar esse arquivo para outro disco, de preferência fora do local. Tais mecanismos de backup estão para além do escopo deste livro. No entanto, qualquer solução de backup sofisticada deve ser capaz de lidar com esse cenário. Lembre-se de que os arquivos de backup também devem ser criptografados.
+
+==== Risco de Carteira Quente
+
+((("Lightning node operation","hot wallet risk")))Como ((("hot wallets","security issues", id="ix_05_node_operations-asciidoc16", range="startofrange")))((("security and privacy","hot wallet risk", id="ix_05_node_operations-asciidoc17", range="startofrange")))discutimos anteriormente, a Lightning Network consiste em uma rede de _hot wallets_. Os fundos armazenados em uma carteira Lightning estão online o tempo todo, o que os torna vulneráveis. Portanto, você não deve armazenar grandes quantidades em uma carteira Lightning. Grandes quantidades devem ser mantidas em uma _cold_ wallet (carteira fria) que _não_ está online e que só pode fazer transações on-chain.
+
+Mesmo que você comece com pouco, com o tempo você pode acabar tendo uma quantia significativa de dinheiro em uma carteira Lightning. Isso é comum em cenários de lojas. Se você usa um nó Lightning para uma operação de comércio eletrônico, é provável que sua carteira receba fundos com frequência, mas envie fundos raramente. Como resultado, você se deparará com dois problemas simultaneamente. Primeiro, seus canais estarão desequilibrados, com saldos locais grandes superando os saldos remotos pequenos. Segundo, você terá muito dinheiro na carteira. Felizmente, é possível resolver ambos os problemas simultaneamente.
+
+Vamos analisar algumas soluções que você pode usar para reduzir os fundos expostos em uma carteira quente.
+
+==== Varrendo Fundos
+
+((("hot wallets","sweeping funds")))((("sweeping funds","hot wallets")))Se o saldo da sua carteira Lightning se tornar muito grande para a sua tolerância de risco, você precisará "varrer" os fundos para fora da carteira. Você pode fazer isso de três maneiras: on-chain (na blockchain), off-chain (fora da blockchain) e usando o serviço Loop Out. Vamos analisar cada uma dessas opções nas próximas seções.
+
+======= Varredura on-chain
+
+((("sweeping funds","on-chain sweep")))Varrer os fundos para a blockchain é realizado movendo os fundos da carteira Lightning para uma carteira Bitcoin. Você faz isso fechando os canais. Ao fechar um canal, todos os fundos do seu saldo local são "varridos" para um endereço Bitcoin. O endereço Bitcoin para os fundos na blockchain geralmente é gerado pela sua carteira Lightning, então ainda é uma carteira online. Você pode precisar fazer uma transação adicional na blockchain para mover os fundos para um endereço mais seguro, como um gerado pela sua carteira de hardware.
+
+Fechar canais incorrerá em uma taxa na blockchain e reduzirá a capacidade e conectividade do seu nó Lightning. No entanto, se você executar um nó de comércio eletrônico popular, não faltará capacidade de entrada e poderá fechar canais estrategicamente com saldos locais grandes, essencialmente "empacotando" seus fundos para movimentação na blockchain. Talvez seja necessário usar técnicas de rebalanceamento de canais (see <<channel_rebalancing>>) antes de fechar canais para maximizar os benefícios dessa estratégia.
+
+===== Varredura off-chain
+
+((("sweeping funds","off-chain sweep")))Outra técnica que você pode usar envolve executar um segundo nó Lightning que não é divulgado na rede. Você pode estabelecer canais de grande capacidade a partir do seu nó público (por exemplo, aquele que executa a sua loja) para o seu nó não divulgado (oculto). Regularmente, "varra" os fundos fazendo um pagamento Lightning para o seu nó oculto.
+
+A vantagem dessa técnica reside no fato de que o nó Lightning que recebe pagamentos para a sua loja será publicamente conhecido. Isso o torna um alvo para hackers, já que qualquer nó Lightning associado a uma loja seria considerado como tendo um saldo alto. Um segundo nó que não esteja associado à sua loja não será facilmente identificado como um alvo valioso.
+
+Como uma medida adicional de segurança, você pode tornar o seu segundo nó um serviço oculto do Tor, de modo que seu endereço IP não seja conhecido. Isso reduz ainda mais as oportunidades de ataques e aumenta a sua privacidade.
+
+Você precisará configurar um script que seja executado em intervalos regulares. O objetivo desse script é criar uma fatura no seu nó oculto e pagar essa fatura a partir do nó da sua loja, transferindo assim os fundos para o seu nó oculto.
+
+Lembre-se de que essa técnica não move os fundos para armazenamento a frio. Ambos os nós do Lightning são carteiras online. O objetivo dessa transferência é mover os fundos de uma carteira online muito conhecida para uma carteira online obscura.
+
+===== Varredura de troca submarina
+
+((("submarine swaps")))((("sweeping funds","submarine swap sweep")))Outra maneira de reduzir o saldo da sua carteira quente Lightning é usar uma técnica chamada _submarine swap_ (troca submarina). Trocas submarinas, conceituadas pelos coautores Olaoluwa Osuntokun e Alex Bosworth, permitem a troca de bitcoin na blockchain por pagamentos Lightning e vice-versa. Essencialmente, as trocas submarinas são trocas atômicas entre fundos off-chain da Lightning e fundos on-chain do Bitcoin.
+
+Um operador de nó pode iniciar uma troca submarina e enviar todos os saldos disponíveis dos canais para a outra parte, que irá enviar bitcoin on-chain em troca.
+
+No futuro, isso poderia ser um serviço pago oferecido pelos nós na Lightning Network que anunciam taxas de câmbio ou cobram uma taxa fixa pela conversão.
+
+A vantagem de uma submarine swap para transferir fundos é que nenhum canal precisa ser fechado. Isso significa que preservamos nossos canais, apenas reequilibrando-os por meio dessa operação. Ao enviar um pagamento pela Lightning, transferimos parte do saldo de local para remoto em um ou mais de nossos canais. Isso não apenas reduz o saldo exposto na carteira quente do nosso nó, mas também aumenta o saldo disponível para futuros pagamentos recebidos.
+
+Você poderia fazer isso confiando em um intermediário para atuar como uma porta de entrada, mas isso arrisca que suas moedas sejam roubadas. No entanto, no caso de uma troca submarina, a operação não requer confiança. Trocas submarinas são operações _atômicas_ não custodiais. Isso significa que a contraparte na sua transação submarina não pode roubar seus fundos, porque o pagamento on-chain depende da conclusão do pagamento off-chain e vice-versa.
+
+===== Troca Submarina com Loop
+
+((("Loop, submarine swaps with")))((("sweeping funds","submarine swaps with Loop")))Um exemplo de serviço de troca submarina é o _Loop_, desenvolvido pela Lightning Labs, a mesma empresa por trás do LND. O Loop possui duas variações: Loop In e Loop Out. O _Loop In_ aceita um pagamento em Bitcoin on-chain e o converte em um pagamento em Lightning off-chain. O _Loop Out_ converte um pagamento Lightning em um pagamento Bitcoin.
+
+[OBSERVAÇÃO]
+====
+Para usar o serviço Loop, você precisa estar executando um nó Lightning LND.
+====
+
+Para reduzir o saldo da sua carteira quente Lightning, você usaria o serviço Loop Out. Para usar o serviço Loop, você precisa instalar alguns softwares adicionais no seu nó. O software Loop é executado ao lado do seu nó LND e fornece algumas ferramentas de linha de comando para executar as operações de trocas submarinas. Você pode encontrar o software Loop e as instruções de instalação em https://github.com/lightninglabs/loop[GitHub].
+
+Uma vez que você tenha o software instalado e em execução, uma operação Loop Out é tão simples quanto executar um único comando:
+
+----
+loop out --amt 501000 --conf_target 400
+Max swap fees for 501000 sat Loop Out: 25716 sat
+Regular swap speed requested, it might take up to 30m0s for the swap to be executed.
+CONTINUE SWAP? (y/n), expand fee detail (x): x
+
+Estimated on-chain sweep fee:        149 sat
+Max on-chain sweep fee:              14900 sat
+Max off-chain swap routing fee:      10030 sat
+Max no show penalty (prepay):        1337 sat
+Max off-chain prepay routing fee:    36 sat
+Max swap fee:                        750 sat
+CONTINUE SWAP? (y/n): y
+Swap initiated
+
+Run `loop monitor` to monitor progress.
+----
+
+Observe que a taxa máxima, que representa um cenário de pior caso, dependerá do alvo de confirmação que você selecionar (((range="endofrange", startref="ix_05_node_operations-asciidoc17")))(((range="endofrange", startref="ix_05_node_operations-asciidoc16"))).(((range="endofrange", startref="ix_05_node_operations-asciidoc15")))(((range="endofrange", startref="ix_05_node_operations-asciidoc14")))(((range="endofrange", startref="ix_05_node_operations-asciidoc13")))
+
+=== Tempo de Atividade e Disponibilidade do Nó Lightning
+
+((("Lightning node operation","uptime and availability", id="ix_05_node_operations-asciidoc18", range="startofrange")))Ao contrário do Bitcoin, os nós Lightning precisam estar online quase continuamente. O seu nó precisa estar online para receber pagamentos, abrir canais, fechar canais (de forma cooperativa) e monitorar violações de protocolo. A disponibilidade do nó é um requisito tão importante na Lightning Network que é uma métrica usada por várias ferramentas automáticas de gerenciamento de canais (por exemplo, +autopilot+) para decidir com quais nós abrir canais. Você também pode ver a "disponibilidade" como uma métrica de nó em exploradores de nós populares (see <<ln_explorer>>) como https://1ml.com[1ML].
+
+A disponibilidade do nó é especialmente importante para mitigar e resolver possíveis violações de protocolo (por exemplo, compromissos revogados). Embora você possa tolerar interrupções breves de uma hora a um ou dois dias, não pode ter o seu nó offline por períodos mais longos sem correr o risco de perda de fundos.
+
+Manter um nó online continuamente não é fácil, pois vários bugs e limitações de recursos podem e eventualmente causarão períodos de inatividade. Especialmente se você estiver executando um nó movimentado e popular, você encontrará limitações de memória, espaço de swap, número de arquivos abertos, espaço em disco e assim por diante. Uma série de problemas diferentes pode fazer com que o seu nó ou servidor falhe.
+
+==== Tolerar Falhas e Automatizar
+
+((("automation, Lightning node")))((("fault tolerance, Lightning node")))((("Lightning node operation","fault toleration and automation")))Se você tiver tempo e habilidades, é recomendado testar alguns cenários de falhas básicas na rede de testes da Lightning. Na rede de testes (testnet), você poderá aprender lições valiosas sem correr o risco de perder fundos. Qualquer medida que você tomar para automatizar o seu sistema melhorará a sua disponibilidade:
+
+Reinício automático do servidor de computador:: O que acontece quando o servidor ou o sistema operacional falham? O que acontece durante uma queda de energia? Simule essa falha pressionando o botão "reset" no seu PC ou desconectando o cabo de energia. Após uma falha, reinício ou queda de energia, o computador deve reiniciar automaticamente. Alguns computadores possuem uma configuração na BIOS para especificar como o computador deve reagir a falhas de energia. Teste para garantir que o computador realmente reinicie automaticamente sem intervenção humana em caso de queda de energia.
+
+Reinício automático do nó:: O que acontece quando o nó ou um dos seus nós falha? Simule essa falha encerrando os processos correspondentes do nó. Se um nó falhar, ele deve reiniciar automaticamente. Teste para garantir que o nó ou nós realmente reiniciem automaticamente em caso de falha, sem intervenção humana. Se isso não acontecer, provavelmente seu nó não está configurado corretamente como um serviço do sistema operacional.
+
+Reconexão automática de rede:: O que acontece se a sua rede ficar indisponível? O que acontece quando o seu provedor de serviços de internet fica temporariamente fora do ar? O que acontece quando o seu provedor de serviços de internet atribui um novo endereço IP ao seu roteador ou ao seu computador? Quando a rede é restabelecida, os nós que você está executando reconectam automaticamente à rede? Simule essa falha desconectando e posteriormente reconectando o cabo Ethernet do dispositivo que hospeda os seus nós. Os nós devem se reconectar automaticamente e continuar em operação sem intervenção humana.
+
+Configure os seus arquivos de log: Todas as falhas mencionadas anteriormente devem deixar registros textuais nos respectivos arquivos de log (logfiles). Aumente a verbosidade do registro se necessário. Localize essas entradas de erro nos arquivos de log e utilize-os para monitoramento.
+
+==== Monitorando a Disponibilidade do Nó
+
+((("Lightning node operation","monitoring node availability")))((("monitoring","node availability")))Monitorar o seu nó é uma parte importante para mantê-lo funcionando. Você precisa monitorar não apenas a disponibilidade do próprio computador, mas também a disponibilidade e o funcionamento correto do software do nó Lightning.
+
+Existem várias maneiras de fazer isso, mas a maioria requer alguma personalização. Você pode usar monitoramento genérico de infraestrutura ou ferramentas de monitoramento de aplicativos, mas precisará personalizá-las especificamente para consultar a API do nó Lightning para garantir que o nó esteja em execução, sincronizado com a blockchain, e conectado aos pares de canais.
+
+https://lightning.watch[Lightning.watch] fornece um serviço especializado que oferece monitoramento do nó Lightning. Ele utiliza um bot do Telegram para notificá-lo sobre quaisquer interrupções no serviço. Este é um serviço gratuito, embora você possa pagar (através da Lightning, é claro) para obter alertas mais rápidos.
+
+Ao longo do tempo, esperamos que mais serviços de terceiros forneçam monitoramento especializado de nós Lightning, pagáveis por meio de micropagamentos. Talvez esses serviços e suas APIs se tornem padronizados e um dia sejam suportadas diretamente pelo software do nó Lightning.
+
+[[watchtowers]]
+==== Torres de Vigia (Watchtowers)
+
+((("Lightning node operation","watchtowers")))((("monitoring","watchtowers")))((("protocol violations, watchtowers and")))((("watchtowers")))_Watchtowers_ são um mecanismo para terceirizar o monitoramento e resolução de penalidades de violações do protocolo Lightning.
+
+Como mencionado nos capítulos anteriores, o protocolo Lightning mantém a segurança por meio de um mecanismo de penalidade. Se um dos seus parceiros de canal transmitir uma transação de compromisso antiga, o seu nó precisará executar a cláusula de revogação e transmitir uma transação de penalidade para evitar perda de fundos. No entanto, se o seu nó estiver inativo durante a violação do protocolo, você poderá perder dinheiro.
+
+Para resolver esse problema, podemos usar um ou mais watchtowers para terceirizar a tarefa de monitorar as violações do protocolo e emitir transações de penalidade. Existem duas partes em uma configuração de watchtower: um servidor de watchtower (ou simplesmente watchtower) que monitora a blockchain e um cliente de watchtower que solicita ao servidor de watchtower esse serviço de monitoramento.
+
+A tecnologia dos watchtowers ainda está em estágios iniciais de desenvolvimento e não é amplamente suportada. No entanto, na passagem a seguir, listamos algumas implementações experimentais que você pode experimentar.
+
+O software LND inclui tanto um servidor watchtower quanto um cliente watchtower. Você pode ativar o servidor watchtower adicionando as seguintes opções de configuração:
+
+[source, subs="quotes"]
+----
+[watchtower]
+watchtower.active=1
+watchtower.towerdir=_/path_to_watchtower_data_directory_
+----
+
+Você pode usar o cliente watchtower do LND ativando-o na configuração e, em seguida, usando a linha de comando para conectá-lo a um servidor watchtower. A configuração é a seguinte:
+
+----
+[wtclient]
+wtclient.active=1
+----
+
+O cliente de linha de comando do LND, +lncli+, mostra as seguintes opções para gerenciar o cliente do watchtower:
+
+----
+$ lncli wtclient
+
+NAME:
+   lncli wtclient - Interact with the watchtower client.
+
+USAGE:
+   lncli wtclient command [command options] [arguments...]
+
+COMMANDS:
+     add     Register a watchtower to use for future sessions/backups.
+     remove  Remove a watchtower to prevent its use for future sessions/backups.
+     towers  Display information about all registered watchtowers.
+     tower   Display information about a specific registered watchtower.
+     stats   Display the session stats of the watchtower client.
+     policy  Display the active watchtower client policy configuration.
+
+OPTIONS:
+   --help, -h  show help
+----
+
+O `c-lightning` possui os ganchos de API necessários para um plug-in de cliente de watchtower, embora nenhum plug-in desse tipo tenha sido implementado até o momento.
+
+Por fim, um servidor de watchtower independente popular é o _The Eye of Satoshi_ (TEOS). Ele pode ser encontrado em https://github.com/talaia-labs/python-teos[GitHub].(((range="endofrange", startref="ix_05_node_operations-asciidoc18")))
+
+=== Gestão de Canais
+
+((("channel management", id="ix_05_node_operations-asciidoc19", range="startofrange")))((("Lightning node operation","channel management", id="ix_05_node_operations-asciidoc20", range="startofrange")))Como operador de um nó Lightning, uma das tarefas recorrentes que você precisará realizar é a gestão dos seus canais. Isso significa abrir canais de saída do seu nó para outros nós, bem como conseguir que outros nós abram canais de entrada para o seu nó. No futuro, a construção cooperativa de canais pode ser possível, permitindo que você abra canais simétricos nos quais os fundos são comprometidos em ambas as extremidades desde o início. Por enquanto, no entanto, novos canais têm fundos apenas em uma extremidade, no lado do originador. Portanto, para _equilibrar_ o seu nó com capacidade de entrada e saída, é necessário abrir canais com outros nós e incentivar outros nós a abrir canais para o seu nó.
+
+==== Abrindo Canais de Saída
+
+((("channel management","opening outbound channels", id="ix_05_node_operations-asciidoc21", range="startofrange")))Assim que você colocar o seu nó Lightning em funcionamento, você pode financiar sua carteira Bitcoin e, em seguida, começar a abrir canais com esses fundos.
+
+Você deve escolher cuidadosamente os parceiros de canal, pois a capacidade do seu nó de enviar pagamentos depende de quem são seus parceiros de canal e de quão bem conectados eles estão com o restante da Lightning Network. Você também deseja ter mais de um canal para evitar ser suscetível a um único ponto de falha. Como o Lightning agora suporta pagamentos multipartes, você pode dividir seus fundos iniciais em vários canais e rotear pagamentos maiores combinando sua capacidade. Ao mesmo tempo, evite tornar seus canais muito pequenos. Como você precisa pagar taxas de transação em Bitcoin para abrir e fechar um canal, o saldo do canal não deve ser tão pequeno a ponto de as taxas on-chain consumirem uma parte significativa. É tudo uma questão de equilíbrio!
+
+Para resumir:
+
+* Conecte-se a alguns nós bem conectados
+* Abra mais de um canal
+* Não abra canais em excesso
+* Não faça os canais muito pequenos
+
+Uma maneira de encontrar nós bem conectados é abrir um canal para um comerciante popular que venda produtos na Lightning Network. Esses nós tendem a ser bem financiados e bem conectados. Então, quando você estiver pronto para comprar algo online via Lightning, você pode abrir um canal diretamente para o nó do comerciante. O ID do nó do comerciante estará na fatura que você receberá ao tentar comprar algo. Isso facilita o processo.
+
+Outra maneira de encontrar nós bem conectados é usar um Explorador da Lightning (see <<ln_explorer>>) como https://1ml.com[1ML] e navegue pela lista de nós classificados por capacidade do canal e número de canais. Não escolha os nós maiores, pois isso incentiva a centralização. Opte por um nó que esteja no meio da lista para ajudá-lo a crescer. Outro fator a considerar pode ser o tempo de operação do nó. Nós estabelecidos há mais de um ano provavelmente são mais respeitáveis e menos arriscados do que nós que começaram a operar há uma semana.
+
+[[autopilot]]
+===== Piloto Automático
+
+((("autopilot", id="ix_05_node_operations-asciidoc22", range="startofrange")))((("channel management","autopilot for", id="ix_05_node_operations-asciidoc23", range="startofrange")))A tarefa de abrir canais pode ser parcialmente automatizada com o uso de um _autopilot_, que é um software que abre canais automaticamente com base em algumas regras heurísticas. O software de autopilot ainda é relativamente novo e nem sempre seleciona os melhores parceiros de canal para você. Especialmente no início, pode ser melhor abrir canais manualmente.
+Atualmente, os autopilots existem em três formas:
+
+- +lnd+ incorpora um autopilot que está totalmente integrado com o +lnd+ e é executado constantemente em segundo plano quando ativado.
+- +lib_autopilot.py+ pode oferecer cálculos de autopilot para qualquer implementação de nó com base nos dados de gossip e de canais.
+- Um plugin +c-lightning+ baseado em +lib_autopilot.py+ existe que fornece uma interface fácil de usar para usuários do +c-lightning+.
+
+((("lnd autopilot", id="ix_05_node_operations-asciidoc24", range="startofrange")))Esteja ciente de que o autopilot do +lnd+ começará a ser executado em segundo plano assim que for ativado através do arquivo de configuração. Como resultado, ele começará a abrir canais imediatamente se você tiver saídas on-chain em sua carteira do +lnd+.
+Se você deseja ter controle total sobre as transações de bitcoin que você realiza e os canais que você abre, certifique-se de desativar o autopilot _antes_ de carregar sua carteira do +lnd+ com fundos de bitcoin.
+Se o autopilot estava anteriormente ativado, você pode precisar reiniciar o +lnd+ antes de adicionar fundos à sua carteira com uma transação on-chain ou antes de fechar canais, o que efetivamente lhe dará fundos on-chain novamente.
+É crucial que você defina valores de configuração-chave se deseja executar o autopilot.
+Dê uma olhada neste exemplo de configuração:
+
+
+----
+[lnd-autopilot]
+autopilot.active=1
+autopilot.maxchannels=40
+autopilot.allocation=0.70
+autopilot.minchansize=500000
+autopilot.maxchansize=5000000
+autopilot.heuristic=top_centrality:1.0
+----
+
+Este arquivo de configuração ativaria o piloto automático.
+Ele abriria canais desde que as duas condições a seguir fossem atendidas:
+
+1. Seu nó atualmente tem menos de 40 canais abertos.
+2. Menos de 70% de seus fundos totais estão off-chain em canais de pagamento.
+
+Os números 40 e 0.7 são escolhidos completamente arbitrariamente aqui porque não podemos fazer recomendações que sejam válidas para todos sobre quantos canais você deve ter abertos e qual porcentagem dos seus fundos deve estar off-chain.
+O autopilot do +lnd+ não levará em consideração as taxas on-chain. Em outras palavras, ele não atrasará a abertura de canais para um período em que as taxas estejam baixas.
+Para reduzir as taxas, você pode abrir canais manualmente durante um período em que as taxas estejam baixas, por exemplo, durante o fim de semana.
+O autopilot fará recomendações de canais sempre que as condições forem atendidas e tentará imediatamente abrir um canal usando as taxas atuais apropriadas. 
+De acordo com o arquivo de configuração anterior, os canais terão um tamanho entre 5 mBTC (`minchansize` = 500.000 satoshis) e 50 mBTC (`maxchansize` = 5.000.000 satoshis).
+Como é comum, os valores no arquivo de configuração estão enumerados em satoshis. 
+Atualmente, canais com menos de 1 mBTC não são muito úteis, e não recomendamos que você abra canais muito pequenos e abaixo desse valor. 
+Com a adoção mais ampla de pagamentos multipartes, canais menores têm menos impacto. No entanto, por enquanto, essa é nossa recomendação. 
+
+((("c-lightning autopilot plugin")))O plug-in +c-lightning+, originalmente escrito por René Pickhardt (um dos coautores deste livro), funciona de maneira muito diferente em comparação com o autopilot do +lnd+.
+Primeiramente, ele difere nos algoritmos usados para fazer as recomendações. Não iremos abordar isso aqui. Em segundo lugar, ele difere na sua interface de usuário.
+Você precisará baixar o _plug-in do autopilot_ do repositório de plug-ins do +c-lightning+ https://github.com/lightningd/plugins/tree/master/autopilot[repository] e ativá-lo.
+
+[OBSERVAÇÃO]
+====
+Para ativar um plug-in no +c-lightning+, coloque-o no diretório _~/.lightning/plugins_, certifique-se de que ele está executável (por exemplo, `chmod +x ~/.lightning/plugins/autopilot.py`), e em seguida, reinicie o +lightningd+.
+
+Alternativamente, se você não quiser que um plug-in seja ativado automaticamente quando iniciar o +lightningd+, você pode colocá-lo em um diretório diferente e ativá-lo manualmente com o argumento +plugin+ para o +lightningd+:
+
+----
+   lightningd --plugin=~/lightning-plugins/autopilot.py
+----
+
+====
+
+O autopiloto no +c-lightning+ é controlado por meio de três valores de configuração que podem ser definidos no arquivo de configuração ou como argumentos de linha de comando ao iniciar o +lightningd+:
+
+----
+[c-lightning-autopilot]
+autopilot-percent=75
+autopilot-num-channels=10
+autopilot-min-channel-size-msat=100000000msat
+----
+
+Esses valores são as configurações padrão reais e você não precisa definí-los.
+
+O piloto automático não será executado automaticamente em segundo plano, como no +lnd+.
+Em vez disso, você precisa iniciar uma execução específica com `lightning-cli autopilot-run-once` se desejar que o autopiloto abra os canais recomendados.
+Mas se você quiser apenas receber recomendações, a partir das quais você pode selecionar manualmente os nós, você pode adicionar o argumento opcional `dryrun`.
+
+Uma diferença fundamental entre o autopilot do +lnd+ e do +c-lightning+ é que o autopilot do +c-lightning+ também fará uma recomendação para o tamanho do canal.
+Por exemplo, se o autopilot recomenda abrir um canal com um nó pequeno que só tem canais pequenos, ele não recomendará abrir um canal grande.
+No entanto, se ele abrir um canal com um nó bem conectado que também tenha muitos canais grandes, provavelmente recomendará um tamanho de canal maior.
+
+Como você pode ver, o autopilot do +c-lightning+ não é tão automático quanto o do +lnd+, mas oferece um pouco mais de controle.
+Essas diferenças refletem preferências pessoais e podem ser o fator decisivo para você escolher uma implementação em detrimento da outra.
+
+Lembre-se de que os autopilots atuais usarão principalmente informações públicas do protocolo de gossip (divulgação) sobre a topologia atual da Lightning Network.
+É óbvio que seus requisitos pessoais para canais só podem ser refletidos até certo grau.
+Autopilots mais avançados usariam informações históricas e de uso que seu nó coletou ao ser executado no passado, incluindo informações sobre o sucesso de roteamento, quem você pagou no passado e quem lhe pagou.
+No futuro, esses pilotos automáticos aprimorados também podem usar esses dados coletados para fazer recomendações sobre o fechamento de canais e a realocação de fundos.(((range="endofrange", startref="ix_05_node_operations-asciidoc24")))
+
+No geral, no momento da escrita deste livro, tenha cuidado para não depender ou confiar demais nos pilotos automáticos(((range="endofrange", startref="ix_05_node_operations-asciidoc23")))(((range="endofrange", startref="ix_05_node_operations-asciidoc22"))).(((range="endofrange", startref="ix_05_node_operations-asciidoc21")))
+
+==== Obtendo Liquidez de Entrada
+
+((("channel management","getting inbound liquidity")))No design atual da Lightning Network, é mais comum para os usuários obterem liquidez de saída (outbound liquidity) _antes_ de obterem liquidez de entrada (inbound liquidity).
+Eles farão isso abrindo um canal com outro nó, e muitas vezes eles poderão gastar bitcoin antes de poderem recebê-lo.
+Existem três maneiras típicas de obter liquidez de entrada:
+
+* Abrir um canal com liquidez de saída e, em seguida, gastar parte desses fundos. Agora o saldo está no outro lado do canal, o que significa que você pode receber pagamentos.
+
+* Peça a alguém para abrir um canal para o seu nó. Ofereça-se para retribuir, para que ambos os nós fiquem mais conectados e equilibrados.
+
+* Use uma transação submarina (por exemplo, Loop In) para trocar BTC na blockchain por um canal de entrada para o seu nó.
+
+* Pague um serviço de terceiros para abrir um canal com você. Existem vários desses serviços disponíveis. Alguns cobram uma taxa para fornecer liquidez, enquanto outros são gratuitos.
+
+[role="pagebreak-before"]
+Aqui está uma lista de provedores de liquidez atualmente disponíveis que abrirão um canal para o seu nó mediante o pagamento de uma taxa:
+
+* https://www.bitrefill.com/thor-lightning-network-channels[Bitrefill's Thor service]
+
+* https://lightningto.me[Lightning To Me]
+
+* https://lnbig.com[LNBig]
+
+* https://lightningconductor.net/channels[Lightning Conductor]
+
+Criar liquidez de entrada é desafiador tanto do ponto de vista prático quanto da experiência do usuário. A liquidez de entrada não ocorre automaticamente, portanto, você precisa encontrar maneiras de construí-la para o seu nó. Essa assimetria dos canais de pagamento também não é intuitiva. Na maioria dos outros sistemas de pagamento, você é pago primeiro (entrada) antes de pagar aos outros (saída).
+
+O desafio de criar liquidez entrante é mais perceptível se você é um comerciante ou vende seus serviços aceitando pagamentos em Lightning. Nesse caso, é preciso estar atento para garantir que você tenha liquidez suficiente para receber pagamentos continuamente. E se houver um aumento repentino de compradores em sua loja, mas eles não puderem efetuar o pagamento devido à falta de capacidade de entrada?
+
+No futuro, esses desafios podem ser parcialmente mitigados pela implementação de canais com financiamento duplo, que são financiados de ambos os lados e oferecem capacidade equilibrada tanto para receber quanto para enviar pagamentos. O ônus também pode ser reduzido com o uso de software de autopilot mais sofisticado, que poderia solicitar e pagar por capacidade entrante conforme necessário.
+
+Em última análise, os usuários da Lightning precisam ser estratégicos e proativos em relação à gestão de canais para garantir que haja capacidade entrante suficiente para atender às suas necessidades.
+
+==== Fechando Canais
+
+((("channel management","closing channels")))Como discutido anteriormente no livro, um _fechamento mútuo_ é a forma preferida de encerrar um canal. ((("force close")))No entanto, existem casos em que um _fechamento forçado_ é necessário.
+
+Alguns exemplos:
+
+* Seu parceiro de canal está offline e não pode ser contatado para iniciar um fechamento mútuo.
+* Seu parceiro de canal está online, mas não está respondendo às solicitações para iniciar um fechamento mútuo.
+* Seu parceiro de canal está online e seus nós estão negociando um fechamento mútuo, mas eles ficam presos e não conseguem chegar a uma resolução.
+
+[[channel_rebalancing]]
+==== Reequilibrando Canais
+
+((("channel management","rebalancing channels")))((("rebalancing channels")))Ao realizar transações e rotear pagamentos na Lightning, a combinação de capacidades de entrada e saída pode se tornar desequilibrada.
+
+Por exemplo, se um dos seus parceiros de canal estiver roteando frequentemente pagamentos através do seu nó, você esgotará a capacidade de entrada nesse canal, ao mesmo tempo em que esgota a capacidade de saída nos canais de saída. Uma vez que isso acontece, você não poderá mais rotear pagamentos por meio desse caminho.
+
+Existem várias maneiras de reequilibrar os canais, cada uma com vantagens e desvantagens diferentes. Uma forma é utilizar um submarine swap (por exemplo, Loop Out), como descrito anteriormente neste capítulo. Outra forma de reequilibrar é simplesmente esperar por pagamentos roteados que fluem na direção oposta. Se o seu nó estiver bem conectado, quando um caminho específico se esgota em uma direção, o mesmo caminho se torna disponível na direção oposta. Outros nós podem "descobrir" esse caminho na direção oposta e começar a usá-lo como parte do caminho de pagamento, reequilibrando assim os fundos novamente.
+
+((("circular route rebalancing")))Uma terceira forma de reequilibrar os canais é criar intencionalmente uma _rota circular_ que envia um pagamento do seu nó de volta para o seu próprio nó, através da Lightning Network. Ao enviar um pagamento por um canal com grande capacidade local e organizar o caminho de forma que ele retorne ao seu nó por um canal com grande capacidade remota, ambos os canais ficarão mais equilibrados. Um exemplo de estratégia de reequilíbrio por rota circular pode ser visto na <<circular_rebalancing>>.
+
+[[circular_rebalancing]]
+.Reequilíbrio por rota circular
+image::images/mtln_0504.png[]
+
+O reequilíbrio circular é suportado pela maioria das implementações de nós da Lightning e pode ser feito através da linha de comando ou por meio de uma das interfaces de gerenciamento web, como o Ride The Lightning (see <<rtl>>).
+
+O reequilíbrio de canais é uma questão complexa que é objeto de pesquisa ativa e é abordado com mais detalhes em <<channel_rebalancing>>.(((range="endofrange", startref="ix_05_node_operations-asciidoc20")))(((range="endofrange", startref="ix_05_node_operations-asciidoc19")))
+
+=== Taxas de Roteamento
+
+((("Lightning node operation","routing fees")))((("routing","fees")))Executar um nó Lightning permite que você ganhe taxas ao encaminhar pagamentos através dos seus canais. No entanto, as taxas de roteamento geralmente não representam uma fonte significativa de renda e são insignificantes em comparação com os custos de operação de um nó. Por exemplo, em um nó relativamente movimentado que encaminha uma dúzia de pagamentos por dia, as taxas podem chegar a no máximo 2.000 satoshis.
+
+Os nós competem pelas taxas de roteamento ao definir a taxa desejada em cada canal. As taxas de roteamento são definidas por dois parâmetros em cada canal: uma _taxa base_ fixa que é cobrada para qualquer pagamento e uma _taxa de tarifa adicional_ variável proporcional ao valor do pagamento.
+
+Ao enviar um pagamento na Lightning, um nó selecionará um caminho de forma a minimizar as taxas, minimizar os saltos ou ambos. Como resultado, surge um mercado de taxas de roteamento a partir dessas interações. Atualmente, existem muitos nós que cobram taxas muito baixas ou nenhuma taxa pelo roteamento, criando uma pressão negativa no mercado de taxas de roteamento.
+
+Se você não fizer escolhas, o seu nó Lightning definirá uma taxa base e uma taxa de tarifa adicional padrão para cada novo canal. Os valores padrão dependem da implementação do nó que você está usando.
+A taxa base é definida na unidade de _millisatoshi_ (milésimos de um satoshi). A taxa de tarifa proporcional é definida na unidade de _milionésimos_ e é aplicada ao valor do pagamento.
+A unidade de milionésimos é frequentemente abreviada com _ppm_ (partes por milhão).
+Por exemplo, uma taxa base de 1.000 (millisatoshi) e uma taxa proporcional de 1.000 ppm (milionésimos) resultariam nas seguintes cobranças para um pagamento de 100.000 satoshis:
+
+[latexmath]
+++++
+\begin{equation}
+\begin{aligned}
+P &= 100,000 \text{ satoshi} \\
+F_{base} &= 1,000 \text{ millisatoshi} = 1 \text{ satoshi} \\
+F_{rate} &= 1,000 \text{ ppm} = 1,000/1,000,000 = 1/1,000 = \text{0.001} = 0.1\% \\
+F_{total} &= F_{base} + ( P * F_{rate} ) \\
+ \Rightarrow  F_{total} &= 1 \text{ satoshi} + ( 100,000/1,000 ) \text{ satoshi} \\
+ \Rightarrow  F_{total} &= 1 \text{ satoshi} + 100 \text{ satoshi} = 101 \text{ satoshi} \\
+\end{aligned}
+\end{equation}
+++++
+
+De uma forma geral, você pode adotar uma de duas abordagens em relação às taxas de roteamento. Você pode rotear muitos pagamentos com taxas baixas, compensando as baixas taxas com um alto volume. Alternativamente, você pode optar por cobrar taxas mais altas. Se você escolher definir taxas mais altas, seu nó será selecionado apenas quando outras rotas mais baratas não estiverem disponíveis. Portanto, você roteará com menos frequência, mas ganhará mais por cada roteamento bem-sucedido.
+
+Para a maioria dos nós, geralmente é melhor usar os valores padrão das taxas de roteamento. Dessa forma, seu nó estará competindo em um campo de jogo mais equilibrado com outros nós que também usam os valores padrão.
+
+Você também pode usar as configurações das taxas de roteamento para rebalancear canais. Se a maioria dos seus canais tiver as taxas padrão, mas você deseja rebalancear um canal específico, basta diminuir as taxas nesse canal específico para zero ou para valores muito baixos. Em seguida, aguarde alguém rotear um pagamento por sua rota "barata" e rebalancear seus canais como um efeito colateral.
+
+=== Gestão de Nó
+
+((("Lightning node operation","node management")))((("node management")))Gerenciar seu nó Lightning na linha de comando obviamente não é fácil. Isso oferece a você a flexibilidade total da API do nó e a capacidade de escrever seus próprios scripts personalizados para atender aos seus requisitos pessoais. Mas se você não deseja lidar com a complexidade da linha de comando e só precisa de algumas capacidades básicas de gerenciamento de nó, considere instalar uma interface de usuário baseada na web que facilite o gerenciamento do nó.
+
+Existem vários projetos concorrentes que oferecem gerenciamento de nó Lightning baseado na web. Alguns dos mais populares são descritos na seção a seguir.
+
+[[rtl]]
+==== Ride The Lightning
+
+((("Lightning node operation","Ride The Lightning (RTL)")))((("node management","Ride The Lightning (RTL)")))((("Ride The Lightning (RTL)")))((("RTL (Ride The Lightning)")))Ride The Lightning (RTL) é uma interface gráfica baseada na web que ajuda os usuários a gerenciar as operações de nós Lightning para as três principais implementações de nós Lightning (LND, `c-lightning` e Eclair). O RTL é um projeto de código aberto desenvolvido por Shahana Farooqui e muitos outros colaboradores. Você pode encontrar o software RTL em https://github.com/Ride-The-Lightning/RTL[GitHub].
+
+<<rtl-web-interface>> apresenta uma captura de tela de exemplo da interface web do RTL, conforme fornecida no repositório do projeto.
+
+[[rtl-web-interface]]
+.Exemplo de interface da Web RTL
+image::images/mtln_0505.png[]
+
+==== lndmon
+
+((("Lightning node operation","lndmon")))((("lndmon")))((("node management","lndmon")))Lightning Labs, os criadores do LND, fornecem uma interface gráfica baseada na web chamada +lndmon+ para monitorar as várias métricas de um nó Lightning LND. O +lndmon+ só funciona com nós LND. É uma interface somente leitura para monitoramento e, portanto, não permite gerenciar ativamente o nó. Não é possível abrir canais ou realizar pagamentos. Encontre o +lndmon+ em https://github.com/lightninglabs/lndmon[GitHub].
+
+==== ThunderHub
+
+((("Lightning node operation","ThunderHub")))((("node management","ThunderHub")))((("ThunderHub")))https://thunderhub.io[ThunderHub] é uma interface gráfica baseada na web muito atraente, semelhante ao RTL, mas exclusiva para o LND. Ela pode ser usada para fazer pagamentos, rebalancear canais e gerenciar o nó por meio de uma variedade de recursos.
+
+=== Conclusão
+
+À medida que você mantém seu nó e adquire experiência, você aprenderá muito sobre a Lightning Network. Ser um operador de nó é uma tarefa desafiadora, mas gratificante. Dominar essas habilidades permitirá que você contribua para o crescimento e desenvolvimento dessa tecnologia e da própria Lightning Network. Além disso, você terá a capacidade de enviar e receber pagamentos na Lightning com o maior grau de controle e facilidade. Você desempenhará um papel central na infraestrutura da rede e não apenas será um participante nas bordas.(((range="endofrange", startref="ix_05_node_operations-asciidoc0")))

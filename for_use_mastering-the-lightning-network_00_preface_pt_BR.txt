@@ -1,0 +1,216 @@
+[preface]
+[[preface]]
+== Prefácio
+
+A Lightning Network (LN) é uma rede ponto a ponto de segunda camada que nos permite realizar pagamentos com Bitcoin "off-chain", ou seja, sem registrá-los como transações na blockchain do Bitcoin.
+
+A Lightning Network (Rede Relâmpago) nos oferece pagamentos em Bitcoin seguros, baratos, rápidos e muito mais privados, mesmo para pagamentos muito pequenos.
+
+Baseando-se na ideia de canais de pagamento, inicialmente proposta pelo inventor do Bitcoin, Satoshi Nakamoto, a Lightning Network é uma rede roteada de canais de pagamento, na qual os pagamentos "saltam" por um caminho de canais de pagamento do remetente ao destinatário.
+
+A ideia inicial da Lightning Network foi proposta em 2015 no artigo inovador intitulado "The Bitcoin Lightning Network: Scalable Off-Chain Instant Payments" (A Rede Lightning do Bitcoin: Pagamentos instantâneos escaláveis fora da cadeia.), escrito por Joseph Poon e Thaddeus Dryja. Até 2017, uma versão de teste da Lightning Network já estava em funcionamento na internet, pois diferentes grupos desenvolveram implementações compatíveis e coordenaram a definição de alguns padrões de interoperabilidade. Em 2018, a Lightning Network foi oficialmente lançada e os pagamentos começaram a ser realizados.
+
+Em 2019, Andreas M. Antonopoulos, Olaoluwa Osuntokun e René Pickhardt concordaram em colaborar para escrever este livro. Parece que fomos bem sucedidos!
+
+[[intended_audience_sec]]
+=== Público-alvo
+
+Este livro destina-se principalmente a leitores técnicos com uma compreensão dos fundamentos do Bitcoin e outras blockchains abertas.
+
+[role="pagebreak-before less_space"]
+[[conventinons_used_sec]]
+=== Convenções Usadas Neste livro
+
+As seguintes convenções tipográficas são usadas neste livro:
+
+_Italic_:: Indica novos termos, URLs, endereços de e-mail, nomes de arquivo e extensões de arquivo.
+
++Constant width+:: Usada para listagens de programas, assim como dentro de parágrafos para se referir a elementos de programas, como nomes de variáveis ​​ou funções, bancos de dados, tipos de dados, variáveis ​​de ambiente, declarações e palavras-chave.
+
+**`Constant width bold`**:: Exibe comandos ou outro texto que deve ser digitado literalmente pelo usuário.
+
+_++Constant width italic++_:: Mostra texto que deve ser substituído por valores fornecidos pelo usuário ou por valores determinados pelo contexto.
+
+[DICA]
+====
+Este elemento significa uma dica ou sugestão.
+====
+
+[OBSERVAÇÃO]
+====
+Este elemento significa uma nota geral.
+====
+
+[AVISO]
+====
+Este elemento indica um aviso ou precaução.
+====
+
+[[code_examples_sec]]
+=== Exemplos de Código
+
+Os exemplos são ilustrados em Go, C++, Python e usando a linha de comando de um sistema operacional semelhante ao Unix. Todos os trechos de código estão disponíveis no repositório do GitHub, na subpasta "code". Faça um fork do código do livro, experimente os exemplos de código ou envie correções através do seguinte link: https://github.com/lnbook/lnbook[GitHub].
+
+Todos os trechos de código podem ser replicados na maioria dos sistemas operacionais com uma instalação mínima de compiladores, interpretadores e bibliotecas para as respectivas linguagens. Quando necessário, fornecemos instruções básicas de instalação e exemplos passo a passo da saída dessas instruções.
+
+Alguns trechos de código e saídas de código foram reformatados para impressão. Em todos esses casos, as linhas foram divididas por um caractere de barra invertida (+\+), seguido por um caractere de nova linha. Ao transcrever os exemplos, remova esses dois caracteres e junte as linhas novamente, e você obterá resultados idênticos aos mostrados no exemplo.
+
+Todos os trechos de código usam valores e cálculos reais sempre que possível, para que você possa construir de exemplo em exemplo e obter os mesmos resultados em qualquer código que você escreva para calcular os mesmos valores. Por exemplo, as chaves privadas, chaves públicas correspondentes e endereços são todos reais.
+
+[[using_code_examples_sec]]
+=== Usando Exemplos de Código
+
+Se você tiver uma pergunta técnica ou um problema usando os exemplos de código, envie um e-mail para pass:[ <a class="email" href="mailto:bookquestions@oreilly.com"><em>bookquestions@oreilly.com</em></a> ].
+
+Este livro está aqui para ajudá-lo a concluir seu trabalho. Em geral, se houver código de exemplo oferecido com este livro, você pode usá-lo em seus programas e documentação. Não é necessário entrar em contato conosco para obter permissão, a menos que você esteja reproduzindo uma parte significativa do código. Por exemplo, escrever um programa que usa vários trechos de código deste livro não requer permissão. Vender ou distribuir exemplos de livros da O'Reilly requer permissão. Responder a uma pergunta citando este livro e citando código de exemplo não requer permissão. Incorporar uma quantidade significativa de código de exemplo deste livro na documentação do seu produto requer permissão.
+
+Agradecemos, mas não exigimos, atribuição. Uma atribuição geralmente inclui o título, autor, editora, ISBN e direitos autorais. Por exemplo:  &#x201c;__Mastering the Lightning Network__ by Andreas M. Antonopoulos, Olaoluwa Osuntokun, and René Pickhardt (O'Reilly). Copyright 2022 aantonop Books LLC, René Pickhardt, and uuddlrlrbas LLC, ISBN 978-1-492-05486-3."
+
+__Mastering the Lightning Network__ é oferecido sob a Licença Atribuição-NãoComercial-SemDerivações 4.0 Internacional (CC BY-NC-ND 4.0).
+
+Se você acha que seu uso de exemplos de código está fora do uso justo ou da permissão dada anteriormente, sinta-se à vontade para nos contatar em pass:[ <a href="mailto:permissions@oreilly.com">permissions@oreilly.com</a> ].
+
+=== Referências a Empresas e Produtos
+
+Todas as referências a empresas e produtos destinam-se a fins educacionais, de demonstração e de referência. Os autores não endossam nenhuma das empresas pass: [ <span class="keep-together">ou produtos</span> ] mencionados. Não testamos a operação ou a segurança de nenhum dos produtos, projetos ou segmentos de código mostrados neste livro. Use-os por sua conta e risco!
+
+[[addresses_and_transactions_sec]]
+=== Endereços e Transações Neste Livro
+
+Os endereços de Bitcoin, transações, chaves, códigos QR e dados de blockchain utilizados neste livro são, em sua maioria, reais. Isso significa que você pode navegar pela blockchain, examinar as transações oferecidas como exemplos, recuperá-las com seus próprios scripts ou programas, etc.
+
+No entanto, observe que as chaves privadas usadas para construir os endereços impressos neste livro foram "queimadas". Isso significa que, se você enviar dinheiro para qualquer um desses endereços, o dinheiro será perdido para sempre ou (mais provavelmente) apropriado, pois qualquer pessoa que ler o livro poderá pegá-lo usando as chaves privadas impressas aqui.
+
+[AVISO]
+====
+NÃO ENVIE DINHEIRO PARA NENHUM DOS ENDEREÇOS DESTE LIVRO. Seu dinheiro será retirado por outro leitor ou perdido para sempre.
+====
+
+=== O'Reilly Online Learning
+
+[role = "ormenabled"]
+[OBSERVAÇÃO]
+====
+Por mais de 40 anos, pass:[ <a href="http://oreilly.com" class="orm:hideurl"><em class="hyperlink">O'Reilly Media</em></a> ] tem fornecido treinamento em tecnologia e negócios, conhecimento, e insights para ajudar as empresas a serem bem-sucedidas.
+====
+
+Nossa rede exclusiva de especialistas e inovadores compartilha seu conhecimento e expertise por meio de livros, artigos e nossa plataforma de aprendizado online. A plataforma de aprendizado online da O'Reilly oferece acesso sob demanda a cursos de treinamento ao vivo, trajetórias de aprendizado aprofundadas, ambientes de codificação interativos e uma vasta coleção de texto e vídeo da O'Reilly e mais de 200 outras editoras. Para mais informações, visite pass:[ <a href="http://oreilly.com" class="orm:hideurl"><em>http://oreilly.com</em></a> ].
+
+[[how_to_contact_us_sec]]
+=== Como Nos Contatar
+
+Informações sobre _Mastering the Lightning Network_, bem como a Open Edition e as traduções estão disponíveis no link:$$https://lnbook.info$$[].
+
+Por favor, dirija comentários e perguntas relacionadas a este livro para o editor:
+
+++++
+<ul class="simplelist">
+  <li>O’Reilly Media, Inc.</li>
+  <li>1005 Gravenstein Highway North</li>
+  <li>Sebastopol, CA 95472</li>
+  <li>800-998-9938 (in the United States or Canada)</li>
+  <li>707-829-0515 (internacional ou local)</li>
+  <li>707-829-0104 (fax)</li>
+</ul>
+++++
+
+Escreva para pass:[<a class="email" href="mailto:bookquestions@oreilly.com"><em>bookquestions@oreilly.com</em></a>] para comentários ou perguntas técnicas sobre este livro.
+
+Para notícias e informações sobre nossos livros e cursos, visite o link:$$http://oreilly.com$$[].
+
+Encontre-nos no Facebook: link:$$http://facebook.com/oreilly$$[]
+
+Siga-nos no Twitter: link:$$http://twitter.com/oreillymedia$$[]
+
+Assista-nos no YouTube: link:$$http://www.youtube.com/oreillymedia$$[]
+
+==== Entrando em Contato com Andreas
+
+Você pode entrar em contato com Andreas M. Antonopoulos em seu site pessoal:
+link:$$https://aantonop.com$$[]
+
+Inscreva-se no canal do Andreas no YouTube:
+link:$$https://www.youtube.com/aantonop$$[]
+
+Curta a página do Andreas no Facebook:
+link:$$https://www.facebook.com/AndreasMAntonopoulos$$[]
+
+Siga Andreas no Twitter:
+link:$$https://twitter.com/aantonop$$[]
+
+Conecte-se com Andreas no LinkedIn:
+link:$$https://linkedin.com/company/aantonop$$[]
+
+Andreas também gostaria de agradecer aos patrocinadores que apoiam seu trabalho por meio de doações mensais. Você pode apoiar Andreas no Patreon pelo link:$$https://patreon.com/aantonop$$[].
+
+==== Entrando em Contato com René
+
+Você pode entrar em contato com René Pickhardt por meio de seu site pessoal:
+link:$$https://ln.rene-pickhardt.de$$[]
+
+Inscreva-se no canal do René no YouTube:
+link:$$https://www.youtube.com/user/RenePickhardt$$[]
+
+Siga René no Twitter:
+link:$$https://twitter.com/renepickhardt$$[]
+
+Conecte-se com René no LinkedIn:
+link:$$https://www.linkedin.com/in/rene-pickhardt-80313744$$[]
+
+René também gostaria de agradecer a todos os patrocinadores que apoiam seu trabalho por meio de doações mensais. Você pode apoiar René no Patreon no link:$$https://patreon.com/renepickhardt$$[].
+
+Ou você pode apoiar o trabalho dele diretamente com Bitcoin (também através da Lightning Network) no link:$$https://donate.ln.rene-pickhardt.de$$[] pelo qual René é igualmente grato.
+
+==== Entrando em Contato com Olaoluwa Osuntokun
+
+Você pode entrar em contato com Olaoluwa Osuntokun por meio de seu endereço de e-mail profissional:
+__laolu@lightning.engineering__
+
+Siga Olaoluwa no Twitter:
+link:$$https://twitter.com/roasbeef$$[]
+
+[[acknowledgments_sec]]
+=== Agradecimentos de Andreas
+
+Devo meu amor pelas palavras e pelos livros à minha mãe, Theresa, que me criou em uma casa com livros revestindo todas as paredes. Minha mãe também comprou meu primeiro computador em 1982, apesar de se autodescrever como tecnófoba. Meu pai, Menelaos, um engenheiro civil que publicou seu primeiro livro aos 80 anos, foi quem me ensinou o pensamento lógico e analítico e o amor pela ciência e pela engenharia.
+
+Obrigado a todos por me apoiarem ao longo desta jornada.
+
+=== Agradecimentos de René
+
+Quero agradecer ao sistema educacional alemão por meio do qual adquiri o conhecimento sobre o qual meu trabalho se baseia. É um dos maiores presentes que recebi.
+Da mesma forma, quero agradecer ao sistema de saúde pública alemão e a cada pessoa que dedica seu tempo trabalhando nessa indústria. Seu esforço e resistência os tornam meus heróis pessoais, e nunca esquecerei a ajuda, paciência e apoio que recebi quando estava precisando.
+Agradeço a todos os estudantes que me permitiram ensinar e que participaram de discussões e perguntas interessantes. Foi com vocês que aprendi mais.
+Também sou grato à comunidade Bitcoin e Lightning Network que me acolheu calorosamente e aos entusiastas e pessoas físicas que apoiaram financeiramente e continuam a apoiar meu trabalho.
+Em particular, sou grato a todos os desenvolvedores de código aberto (não apenas do Bitcoin e da Lightning Network) e às pessoas que os financiam para tornar essa tecnologia possível.
+Um agradecimento especial vai para meus coautores por me acompanharem durante a tempestade.
+Por último, mas não menos importante, sou grato aos meus entes queridos.
+
+=== Agradecimentos de Olaoluwa Osuntokun
+
+Gostaria de agradecer à incrível equipe do Lightning Labs, pois sem vocês, não
+não haveria LND. Também gostaria de agradecer ao conjunto original de autores da especificação BOLT:
+Rusty Russell, Fabrice Drouin, Conner Fromnkchet, Pierre-Marie
+Padiou, Lisa Neigut e Christian Decker. Por último, mas não menos importante, gostaria de
+agradecer a Joseph Poon e Tadge Dryja, os autores do artigo original sobre a Lightning Network,
+pois sem eles não existiria uma Rede Lightning para escrevermos um 
+livro sobre.
+
+[[github_contrib]]
+=== Contribuições
+
+Muitos colaboradores ofereceram comentários, correções e adições ao livro enquanto ele era escrito de forma colaborativa no GitHub.
+
+A seguir está uma lista em ordem alfabética de todos os contribuidores do GitHub, incluindo seus IDs do GitHub entre parênteses:
+
+include::github_contributors.asciidoc[]
+
+Sem a ajuda oferecida por todos os listados aqui, este livro não teria sido possível. Suas contribuições demonstram o poder do código aberto e da cultura aberta, e somos eternamente gratos por sua ajuda.
+
+Obrigado.
+
+=== Fontes
+
+Parte do material deste livro foi obtido de uma variedade de fontes de domínio público, fontes de licença aberta ou com permissão. Veja <<sources_licenses>> para fontes, licenças, e detalhes de atribuição.
+
+

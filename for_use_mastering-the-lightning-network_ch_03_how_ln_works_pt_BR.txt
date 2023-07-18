@@ -1,0 +1,776 @@
+[[ch03_How_Lightning_Works]]
+== Como Funciona a Rede Lightning
+
+((("Lightning Network (generally)","mechanism of operation", id="ix_03_how_ln_works-asciidoc0", range="startofrange")))Agora que acompanhamos Alice ao configurar uma carteira Lightning e comprar um café de Bob, vamos examinar em detalhes os diferentes componentes da Lightning Network envolvidos nesse processo.
+Este capítulo fornecerá uma visão geral de alto nível e não aprofundará todos os detalhes técnicos.
+O objetivo é ajudá-lo a compreender os conceitos mais importantes e os componentes fundamentais da Lightning Network.
+
+Se você tiver experiência em ciência da computação, criptografia, Bitcoin e desenvolvimento de protocolos, este capítulo deve ser suficiente para que você possa preencher os detalhes de conexão por conta própria.
+Se você tiver menos experiência, este capítulo fornecerá uma visão geral adequada para que você possa compreender melhor as especificações formais do protocolo, conhecidas como BOLTs (Basis of Lightning Technology). 
+Se você é um iniciante, este capítulo ajudará você a compreender melhor os capítulos técnicos do livro.
+
+Se você precisa relembrar os fundamentos do Bitcoin, você pode encontrar uma revisão resumida dos seguintes tópicos no <<bitcoin_fundamentals_review>>:
+
+* Chaves e endereços
+* Funções hash
+* Assinaturas digitais
+* Estrutura da transação
+* Entradas e saídas de transações
+* Encadeamento de transações
+* Bitcoin Script
+* Scripts e endereços multiassinatura (multisig)
+* Timelocks
+* Scripts complexos
+
+Vamos começar com uma definição em uma frase do que é a Lightning Network e analisá-la detalhadamente no restante deste capítulo.
+
+A Lightning Network é uma rede peer-to-peer (ponto a ponto) de _canais de pagamento_ implementados como contratos inteligentes na _blockchain do Bitcoin_, juntamente com um protocolo de comunicação que define como os participantes configuram e executam esses contratos inteligentes.
+
+[[what_is_payment_channel]]
+=== O Que É um Canal de Pagamento?
+
+((("Lightning Network (generally)","payment channel defined")))((("payment channel","defined")))Existem várias maneiras de descrever um canal de pagamento, dependendo do contexto. Vamos começar em um nível mais alto e depois adicionar mais detalhes.
+
+Um canal de pagamento é um _relacionamento financeiro_ entre dois nós na Lightning Network, chamados de _parceiros do canal_. O relacionamento financeiro aloca um _saldo de fundos_ (denominado em milisatoshis), entre os dois parceiros do canal.
+
+((("cryptographic protocol")))O canal de pagamento é gerenciado por um _protocolo criptográfico_, o que significa que um processo pré-definido baseado em criptografia é usado pelos parceiros do canal para redistribuir o saldo do canal em favor de um ou outro dos parceiros. O protocolo criptográfico garante que um parceiro do canal não possa enganar o outro, de modo que os parceiros não precisem confiar um no outro.
+
+O protocolo criptográfico é estabelecido pelo financiamento de um endereço de _multisig_ (assinatura múltipla) 2-de-2, que exige que os dois parceiros do canal cooperem e impede que qualquer um dos parceiros do canal gaste os fundos unilateralmente.
+
+Para resumir: um canal de pagamento é um relacionamento financeiro entre nós, que aloca fundos de um endereço de assinatura múltipla por meio de um protocolo criptográfico estritamente definido.
+
+=== Noções Básicas do Canal de Pagamento
+
+((("Lightning Network (generally)","payment channel basics")))((("payment channel","basics")))No cerne do canal de pagamento está apenas um endereço de assinatura múltipla 2-de-2 na blockchain do Bitcoin, para o qual você possui uma chave e seu parceiro do canal possui a outra chave.
+
+Você e seu parceiro do canal negociam uma sequência de transações que gastam desse endereço de assinatura múltipla. Em vez de transmitir e registrar essas transações na blockchain do Bitcoin, ambos as mantêm, não gastas.
+
+A transação mais recente nessa sequência codifica o saldo do canal e define como esse saldo é dividido entre você e seu parceiro do canal.
+
+Dessa forma, adicionar uma nova transação a essa sequência equivale a mover parte do saldo do canal de um parceiro do canal para o outro, sem que a rede Bitcoin esteja ciente disso. Conforme você negocia cada nova transação, alterando a alocação de fundos no canal, você também revoga a transação anterior, para que nenhuma das partes possa retroceder para um estado anterior.
+
+Cada transação na sequência faz uso da linguagem de script do Bitcoin, e, portanto, a negociação de fundos entre você e seu parceiro do canal é gerenciada por um contrato inteligente do Bitcoin.
+O contrato inteligente é configurado para penalizar um membro do canal se ele tentar enviar um estado previamente revogado do canal.
+
+[NOTA]
+====
+Se você tiver uma transação não publicada de um endereço de assinatura múltipla 2-de-2 que lhe paga parte do saldo, então uma assinatura da outra parte garante que você possa publicar independentemente essa transação a qualquer momento, adicionando sua própria assinatura.
+
+A capacidade de manter uma transação parcialmente assinada, offline e não publicada, com a opção de publicar e possuir esse saldo a qualquer momento é a base da Lightning Network.
+====
+
+=== Roteamento de Pagamentos Entre Canais
+
+((("Lightning Network (generally)","routing payments across channels")))((("payment channel","routing payments across channels")))Uma vez que vários participantes possuem canais de pagamento de uma parte para outra, os pagamentos também podem ser "encaminhados" de um canal de pagamento para outro, configurando um _caminho_ pela rede que conecta vários canais de pagamento juntos.
+
+Por exemplo, Alice pode enviar dinheiro para Charlie se Alice tiver um canal com Bob e Bob tiver um canal com Charlie.
+
+Pelo design da Lightning Network, é possível estender os contratos inteligentes que operam o canal de forma que Bob não tenha como roubar os fundos que estão sendo encaminhados por meio de seu canal.
+
+Da mesma forma que o contrato inteligente protege os parceiros do canal para que eles não precisem confiar um no outro, toda a rede protege os participantes para que eles possam encaminhar pagamentos sem confiar em nenhum dos outros participantes.
+
+Porque os canais são construídos a partir de endereços de múltiplas assinaturas e as transações de atualização de saldo são transações pré-assinadas do Bitcoin, toda a confiança necessária para operar a Lightning Network advém da confiança na rede descentralizada do Bitcoin!
+
+As inovações mencionadas são certamente os avanços fundamentais que permitiram a criação da Lightning Network.
+No entanto, a Lightning Network é muito mais do que os protocolos criptográficos por cima da linguagem Bitcoin Script.
+É um protocolo de comunicação abrangente que permite que os pares troquem mensagens Lightning para realizar a transferência de bitcoin.
+O protocolo de comunicação define como as mensagens Lightning são criptografadas e trocadas.
+
+A Lightning Network também utiliza um protocolo de gossip (fofoca, ou transmissão) para distribuir informações públicas sobre os canais (topologia da rede) para todos os participantes.
+
+Alice, por exemplo, precisa das informações da topologia da rede para estar ciente do canal entre Bob e Charlie, para que ela possa construir uma rota até Charlie.
+
+Por último, mas não menos importante, é essencial entender que a Lightning Network não passa de uma aplicação em cima do Bitcoin, utilizando transações de Bitcoin e o Bitcoin Script. Não existe uma "moeda Lightning" ou "blockchain Lightning".
+Além de todas as primitivas técnicas, o protocolo LN é uma maneira criativa de obter mais benefícios do Bitcoin, permitindo um número arbitrário de pagamentos instantâneos com liquidações instantâneas, sem a necessidade de confiar em qualquer pessoa além da rede do Bitcoin.
+
+=== Canais de Pagamento
+
+Como vimos no capítulo anterior, Alice usou seu software de carteira para criar um canal de pagamento entre ela mesma e outro participante da LN.
+
+((("payment channel","limitations on")))Um canal é limitado apenas por três coisas:
+
+* Primeiro, o tempo necessário para a internet transferir as poucas centenas de bytes de dados que o protocolo requer para mover os fundos de uma ponta do canal para a outra.
+
+* Segundo, a capacidade do canal, ou seja, a quantidade de bitcoin que é comprometida com o canal quando ele é aberto.
+
+* Terceiro, o limite máximo de tamanho de uma transação do Bitcoin também limita o número de pagamentos roteados incompletos (em andamento) que podem ser realizados simultaneamente por um canal.
+
+((("payment channel","useful properties")))Os canais de pagamento possuem algumas propriedades muito interessantes e úteis:
+
+* Devido ao fato de que o tempo para atualizar um canal está principalmente ligado à velocidade de comunicação da internet, fazer um pagamento em um canal de pagamento pode ser praticamente instantâneo.
+
+* Se o canal estiver aberto, fazer um pagamento não requer a confirmação de blocos do Bitcoin. Na verdade&#x2014;desde que você e seu parceiro do canal sigam o protocolo&#x2014;não é necessário nenhuma interação com a rede Bitcoin ou qualquer outra pessoa além do seu parceiro do canal.
+
+[role="pagebreak-before"]
+* O protocolo criptográfico é construído de tal forma que há pouca ou nenhuma confiança necessária entre você e seu parceiro do canal. Se o seu parceiro se tornar inativo ou tentar enganá-lo, você pode solicitar ao sistema Bitcoin que atue como um "tribunal", resolvendo o contrato inteligente que você e seu parceiro concordaram anteriormente.
+
+* Os pagamentos feitos em um canal de pagamento são conhecidos apenas por você e seu parceiro. Nesse sentido, você ganha privacidade em comparação com o Bitcoin, onde todas as transações são públicas. Apenas o saldo final, que é a agregação de todos os pagamentos nesse canal, se tornará visível na blockchain do Bitcoin.
+
+O Bitcoin tinha cerca de cinco anos de idade quando talentosos desenvolvedores descobriram pela primeira vez como construir canais de pagamento bidirecionais, com duração indefinida e roteáveis. Desde então, agora existem pelo menos três métodos conhecidos.
+
+Este capítulo se concentrará no método de construção do canal descrito inicialmente no https://lightning.network/lightning-network-paper.pdf[Lightning Network whitepaper] por Joseph Poon e Thaddeus Dryja in 2015. ((("Poon-Dryja channels")))Esses são conhecidos como canais _Poon-Dryja_ e são o método de construção do canal atualmente utilizado na Lightning Network.
+Os outros dois métodos propostos são os canais _Duplex Micropayment_, introduzidos por Christian Decker na mesma época dos canais Poon-Dryja, e os canais _eltoo_, introduzidos em https://blockstream.com/eltoo.pdf["eltoo: A Simple Layer2 Protocol for Bitcoin"]  por Christian Decker, Rusty Russel, e (coautor deste livro) Olaoluwa Osuntokun em 2018.
+
+Os canais eltoo possuem algumas propriedades interessantes e simplificam a implementação de canais de pagamento. No entanto, os canais eltoo exigem uma alteração na linguagem de script do Bitcoin e, portanto, não podem ser implementados na rede principal do Bitcoin em 2020.
+
+==== Endereço de Assinatura Múltipla
+
+((("multisignature addresses")))((("payment channel","multisignature addresses")))Os canais de pagamento são construídos em cima de endereços de assinatura múltipla 2-de-2.
+
+Resumidamente, um endereço de assinatura múltipla é onde o bitcoin é bloqueado de forma que requer múltiplas assinaturas para desbloqueá-lo e gastá-lo. Em um endereço de assinatura múltipla 2-de-2, como usado na Lightning Network, existem dois participantes assinantes e _ambos_ precisam assinar para gastar os fundos.
+
+Os scripts e endereços de assinatura múltipla são explicados em mais detalhes em <<multisig>>.
+
+[role="pagebreak-before less_space"]
+==== Transação de Financiamento
+
+((("funding transaction")))((("payment channel","funding transaction")))O elemento fundamental de um canal de pagamento é um endereço de assinatura múltipla 2-de-2. Um dos dois parceiros do canal financiará o canal de pagamento enviando bitcoin para o endereço de assinatura múltipla. Essa transação é chamada de _transação de financiamento_ e é registrada na blockchain do Bitcoin.footnote:[Embora o whitepaper original do Lightning descrevesse canais financiados por ambos os parceiros do canal, a especificação atual, a partir de 2020, pressupõe que apenas um dos parceiros comprometa fundos para o canal. A partir de maio de 2021, os canais Lightning com financiamento duplo são experimentais na implementação LN do c-lightning.]
+
+Embora a transação de financiamento seja pública, não é óbvio que se trata de um canal de pagamento da Lightning até que ele seja fechado, a menos que o canal seja anunciado publicamente. Os canais geralmente são anunciados publicamente por nós de roteamento que desejam encaminhar pagamentos. No entanto, também existem canais não anunciados, que são geralmente criados por nós móveis que não participam ativamente do roteamento. Além disso, os pagamentos do canal ainda não são visíveis para ninguém além dos parceiros do canal, assim como a distribuição do saldo do canal entre eles.
+
+((("channel capacity")))A quantia depositada no endereço de assinatura múltipla é chamada de _capacidade do canal_ e define o valor máximo que pode ser enviado pelo canal de pagamento. No entanto, como os fundos podem ser enviados de um lado para o outro, a capacidade do canal não é o limite máximo para a quantidade de valor que pode fluir pelo canal. Isso ocorre porque, se a capacidade do canal for esgotada com pagamentos em uma direção, ela pode ser usada novamente para enviar pagamentos na direção oposta.
+
+
+[NOTA]
+====
+Os fundos enviados para o endereço de assinatura múltipla na transação de financiamento são às vezes chamados de "bloqueados em um canal Lightning". No entanto, na prática, os fundos em um canal Lightning não estão "bloqueados", mas sim "liberados". Os fundos do canal Lightning são mais líquidos do que os fundos na blockchain do Bitcoin, pois podem ser gastos de forma mais rápida, barata e privada. Existem algumas desvantagens em mover fundos para a Lightning Network (como a necessidade de mantê-los em uma carteira "quente"—hot wallet, online), mas a ideia de "bloquear fundos" na Lightning é enganosa.
+====
+
+===== Exemplo de um procedimento ruim de abertura de canal 
+
+((("payment channel","example of poor channel opening procedure")))Se você pensar cuidadosamente sobre endereços de assinatura múltipla 2-de-2, você perceberá que colocar seus fundos em um endereço desse tipo parece carregar algum risco. E se o seu parceiro do canal se recusar a assinar uma transação para liberar os fundos? Eles ficam presos para sempre? Vamos analisar esse cenário e como o protocolo da LN o evita.
+
+Alice e Bob desejam criar um canal de pagamento. Cada um deles cria um par de chaves privada/pública e, em seguida, trocam as chaves públicas. Agora, eles podem construir uma assinatura múltipla 2-de-2 com as duas chaves públicas, formando a base para o seu canal de pagamento.
+
+Em seguida, Alice constrói uma transação do Bitcoin enviando alguns mBTC para o endereço de assinatura múltipla criado a partir das chaves públicas de Alice e Bob. Se Alice não tomar nenhuma medida adicional e simplesmente transmitir essa transação, ela terá que confiar que Bob fornecerá sua assinatura para gastar os fundos do endereço de assinatura múltipla. Por outro lado, Bob teria a oportunidade de chantagear Alice retendo a assinatura dele assinatura e negando a Alice acesso aos seus fundos.
+
+Para evitar isso, Alice precisará criar uma transação adicional que gasta a partir do endereço de assinatura múltipla, reembolsando seus mBTC. Alice então pede a Bob para assinar a transação de reembolso _antes_ de transmitir sua transação de financiamento para a rede Bitcoin. Dessa forma, Alice pode obter um reembolso mesmo se Bob desaparecer ou se recusar a cooperar.
+
+A transação de "reembolso" que protege Alice é a primeira de uma classe de transações chamadas de _transações de compromisso_ (commitment transactions), que examinaremos com mais detalhes a seguir.
+
+==== Transação de Compromisso
+
+((("commitment transactions")))((("payment channel","commitment transaction")))Uma _transação de compromisso_ é uma transação que paga a cada parceiro do canal o saldo do canal e garante que os parceiros do canal não precisem confiar um no outro. Ao assinar uma transação de compromisso, cada parceiro do canal "compromete-se" com o saldo atual e dá ao outro parceiro do canal a capacidade de obter seus fundos de volta quando desejar.
+
+Ao possuir uma transação de compromisso assinada, cada parceiro do canal pode obter seus fundos mesmo sem a cooperação do outro parceiro do canal. Isso os protege contra o desaparecimento do outro parceiro do canal, recusa em cooperar ou tentativa de trapaça violando o protocolo do canal de pagamento.
+
+A transação de compromisso que Alice preparou no exemplo anterior era um reembolso de seu pagamento inicial para o endereço de assinatura múltipla. De forma mais geral, no entanto, uma transação de compromisso divide os fundos do canal de pagamento, pagando aos dois parceiros do canal de acordo com a distribuição (saldo) que cada um deles possui. No início, Alice detém todo o saldo, então é um simples reembolso. Mas à medida que os fundos fluem de Alice para Bob, eles trocarão assinaturas para novas transações de compromisso que representam a nova distribuição do saldo, com parte dos fundos pagos a Alice e parte pagos a Bob.
+
+Vamos supor que Alice abre um canal com uma capacidade de 100.000 satoshis com Bob.
+Inicialmente, Alice possui 100.000 satoshis, a totalidade dos fundos no canal. Vejamos como funciona o protocolo do canal de pagamento:
+
+. Alice cria um novo par de chaves privada/pública e informa a Bob que deseja abrir um canal por meio da mensagem `open_channel` (uma mensagem no protocolo da LN).
+. Bob também cria um novo par de chaves privada/pública e concorda em aceitar um canal de Alice, enviando sua chave pública para Alice por meio da mensagem `accept_channel`.
+. Agora, Alice cria uma transação de financiamento em sua carteira que envia 100.000 satoshis para o endereço de assinatura múltipla com um script de bloqueio: +2 <PubKey Alice> <PubKey Bob> 2 CHECKMULTISIG+.
+. Alice ainda não transmite essa transação de financiamento, mas envia para Bob o ID da transação na mensagem `funding_created`, juntamente com sua assinatura para a transação de compromisso de Bob.
+. Tanto Alice quanto Bob criam sua versão de uma transação de compromisso. Essa transação gastará da transação de financiamento e enviará todos os bitcoin de volta para um endereço controlado por Alice.
+. Alice e Bob não precisam trocar essas transações de compromisso, pois cada um sabe como elas são construídas e podem construir ambas de forma independente (porque concordaram com uma ordenação canônica das entradas e saídas). Eles apenas precisam trocar assinaturas.
+. Bob fornece uma assinatura para a transação de compromisso de Alice e envia de volta para Alice por meio da mensagem `funding_signed`.
+. Agora que as assinaturas foram trocadas, Alice irá transmitir a transação de financiamento para a rede Bitcoin.
+
+Ao seguir esse protocolo, Alice não perde a propriedade de seus 100.000 satoshis, mesmo que os fundos sejam enviados para um endereço de assinatura múltipla 2-de-2 no qual Alice controle apenas uma chave.
+Se Bob parar de responder a Alice, ela poderá transmitir sua transação de compromisso e receber seus fundos de volta.
+Seus únicos custos são as taxas das transações na cadeia (on-chain).
+Desde que ela siga o protocolo, esse é o único risco que ela enfrenta ao abrir um canal.
+
+Após essa troca inicial, transações de compromisso são criadas cada vez que o saldo do canal é alterado. Em outras palavras, cada vez que um pagamento é enviado entre Alice e Bob, novas transações de compromisso são criadas e assinaturas são trocadas. Cada nova transação de compromisso codifica o saldo mais recente entre Alice e Bob.
+
+Se Alice deseja enviar 30.000 satoshis para Bob, ambos criarão uma nova versão de suas transações de compromisso, que agora pagarão 70.000 satoshis para Alice e 30.000 satoshis para Bob. Ao codificar um novo saldo para Alice e Bob, as novas transações de compromisso são o meio pelo qual um pagamento é "enviado" pelo canal.
+
+Agora que entendemos as transações de compromisso, vamos analisar alguns detalhes mais sutis. Você pode perceber que esse protocolo deixa uma maneira para que Alice ou Bob trapaceiem.
+
+==== Traição com Estado Anterior
+
+((("cheating","with prior state", id="ix_03_how_ln_works-asciidoc1", range="startofrange")))((("payment channel","cheating with prior state", id="ix_03_how_ln_works-asciidoc2", range="startofrange")))Quantas transações de compromisso Alice possui depois de pagar 30.000 satoshis para Bob? Ela possui duas: a original, que paga a ela 100.000 satoshis, e a mais recente, que paga a ela 70.000 satoshis e a Bob 30.000 satoshis.
+
+No protocolo do canal que vimos até agora, nada impede que Alice publique uma transação de compromisso anterior. Uma Alice desonesta poderia publicar a transação de compromisso que lhe concede 100.000 satoshis.
+Uma vez que aquela transação de compromisso foi assinada por Bob, ele não pode impedir que Alice a transmita.
+
+De fato, é necessário algum mecanismo para evitar que Alice publique uma transação de compromisso antiga. Agora, vamos descobrir como isso pode ser alcançado e como isso permite que a Lightning Network opere sem exigir qualquer confiança entre Alice e Bob.
+
+Como o Bitcoin é resistente à censura, ninguém pode impedir alguém de publicar uma transação de compromisso antiga. Para evitar essa forma de trapaça, as transações de compromisso são construídas de forma que, se uma transação antiga for transmitida, o trapaceiro possa ser punido. Ao tornar a penalidade suficientemente alta, criamos um forte incentivo contra a trapaça, o que torna o sistema seguro.
+
+A forma como a penalidade funciona é dando à parte prejudicada a oportunidade de reivindicar o saldo do trapaceiro. Portanto, se alguém tentar trapacear transmitindo uma transação de compromisso antiga, na qual eles são pagos com um saldo mais alto do que o devido, a outra parte pode puni-los tomando _ambos_ seu próprio saldo quanto o saldo do trapaceiro. O trapaceiro perde tudo.
+
+[DICA]
+====
+Você pode perceber que, se Alice esgotar completamente o saldo do seu canal, ela poderia tentar trapacear com pouco risco. A penalidade para Bob não seria tão dolorosa se o saldo do canal de Alice estiver baixo. Para evitar isso, o protocolo Lightning requer que cada parceiro de canal mantenha um saldo mínimo no canal (chamado de _reserva_) para que eles sempre tenham um interesse no jogo.
+====
+
+Vamos revisar o cenário de construção do canal novamente, adicionando um mecanismo de penalidade para proteger contra trapaças:
+
+. Alice cria um canal com Bob e coloca 100.000 satoshis nele.
+. Alice envia 30.000 satoshis para Bob.
+. Alice tenta enganar Bob de seus merecidos 30.000 satoshis, publicando uma antiga transação de compromisso, reivindicando os 100.000 satoshis completos para si mesma.
+. Bob detecta a fraude e pune Alice, tomando os 100.000 satoshis completos para si mesmo.
+. Bob acaba com 100.000 satoshis, ganhando 70.000 satoshis por pegar Alice trapaceando.
+. Alice acaba com 0 satoshi.
+. Ao tentar enganar Bob em 30.000 satoshis, ela acaba perdendo os 70.000 satoshis que possuía.
+
+Com um mecanismo de penalidade rigoroso, Alice não é tentada a trapacear publicando uma antiga transação de compromisso, pois corre o risco de perder todo o seu saldo.
+
+[NOTA]
+====
+No Capítulo 12 de _Mastering Bitcoin_, Andreas Antonopoulos (o coautor deste livro) o descreve da seguinte forma:
+"Uma característica fundamental do Bitcoin é que, uma vez que uma transação é válida, ela permanece válida e não expira. A única maneira de cancelar uma transação é realizando um gasto duplo de suas entradas com outra transação antes que ela seja minerada."
+====
+
+Agora que entendemos o _porquê_ de um mecanismo de penalidade ser necessário e como ele impede trapaças, vamos ver _como_ ele funciona em detalhes.
+
+Normalmente, a transação de compromisso tem pelo menos duas saídas, pagando cada parceiro do canal. ((("revocation secret")))((("timelock delay")))Nós alteramos isso para adicionar um _timelock delay_ (atraso de bloqueio temporal) e um _revocation secret_ (segredo de revogação) a um dos pagamentos. O atraso de bloqueio temporal impede que o proprietário do output o gaste imediatamente assim que a transação de compromisso for incluída em um bloco. O segredo de revogação permite que qualquer uma das partes gaste esse pagamento imediatamente, contornando o atraso de bloqueio temporal.
+
+Então, em nosso exemplo, Bob detém uma transação de compromisso que paga Alice _imediatamente_, mas seu próprio pagamento está atrasado e sujeito a revogação. Alice também possui uma transação de compromisso, mas a dela é o oposto: ela paga Bob imediatamente, mas seu próprio pagamento está atrasado e sujeito a revogação.
+
+Os dois parceiros do canal possuem metade do segredo de revogação, de forma que nenhum deles conhece o segredo completo. Se eles compartilharem sua metade, então o outro parceiro do canal terá o segredo completo e poderá usá-lo para exercer a condição de revogação. Ao assinar uma nova transação de compromisso, cada parceiro do canal revoga o compromisso anterior, fornecendo à outra parte sua metade do segredo de revogação.
+
+Vamos examinar o mecanismo de revogação em mais detalhes em <<revocation>>, onde aprenderemos os detalhes de como os segredos de revogação são construídos e utilizados.
+
+Em termos simples, Alice assina a nova transação de compromisso de Bob apenas se ele oferecer sua metade do segredo de revogação do compromisso anterior. Bob só assina a nova transação de compromisso de Alice se ela lhe fornecer sua metade do segredo de revogação do compromisso anterior.
+
+Com cada novo compromisso, eles trocam o segredo de "punição" necessário que lhes permite efetivamente revogar a transação de compromisso anterior, tornando-a não lucrativa para ser transmitida. Essencialmente, eles destroem a capacidade de usar compromissos antigos à medida que assinam os novos. O que queremos dizer é que, embora ainda seja tecnicamente possível usar compromissos antigos, o mecanismo de penalidade torna economicamente irracional pass:[<span class="keep-together">fazê-lo</span>].
+
+O bloqueio temporal é definido para um número de blocos de até 2.016 (aproximadamente duas semanas). Se qualquer um dos parceiros do canal publicar uma transação de compromisso sem cooperar com o outro parceiro, eles terão que esperar esse número de blocos (por exemplo, duas semanas) para reivindicar seu saldo. O outro parceiro do canal pode reivindicar seu próprio saldo a qualquer momento. Além disso, se o compromisso que eles publicaram foi previamente revogado, o parceiro do canal _também_ pode reivindicar imediatamente o saldo do trapaceiro, contornando o bloqueio temporal e punindo o trapaceiro.
+
+O bloqueio temporal é ajustável e pode ser negociado entre os parceiros do canal. Normalmente, ele é mais longo para canais com maior capacidade e mais curto para canais menores, para alinhar os incentivos com o valor dos fundos envolvidos.
+
+Para cada nova atualização do saldo do canal, novas transações de compromisso e novos segredos de revogação precisam ser criados e salvos. Enquanto um canal permanecer aberto, todos os segredos de revogação _já criados_ para o canal precisam ser mantidos, pois podem ser necessários no futuro. Felizmente, os segredos são relativamente pequenos e apenas os parceiros do canal precisam mantê-los, não toda a rede. Além disso, devido a um mecanismo inteligente de derivação usado para derivar segredos de revogação, só precisamos armazenar o segredo mais recente, pois segredos anteriores podem ser derivados a partir dele (see <<revocation_secret_derivation>>).
+
+No entanto, gerenciar e armazenar os segredos de revogação é uma das partes mais elaboradas dos nós Lightning, que requer que os operadores dos nós mantenham backups.
+
+[NOTA]
+====
+Tecnologias como serviços de torre de observação (watchtower services) ou a alteração do protocolo de construção de canal para o protocolo Eltoo podem ser estratégias futuras para mitigar esses problemas e reduzir a necessidade de segredos de revogação, transações de penalidade e backups de canal. 
+====
+
+Alice pode fechar o canal a qualquer momento se Bob não responder, reivindicando sua parte justa do saldo.
+Após publicar a _última_ transação de compromisso na cadeia de blocos, Alice precisa esperar o vencimento do bloqueio temporal antes de poder gastar seus fundos provenientes da transação de compromisso. Como veremos mais adiante, existe uma maneira mais fácil de fechar um canal sem esperar, desde que Alice e Bob estejam online e cooperem para fechar o canal com a alocação correta dos saldos. No entanto, as transações de compromisso armazenadas por cada parceiro do canal atuam como uma medida de segurança, garantindo que eles não percam fundos caso haja um problema com o parceiro do canal.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc2")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc1")))
+
+==== Anunciando o Canal
+
+((("payment channel","announcing the channel")))((("public channel, announcing")))Os parceiros do canal podem concordar em anunciar seu canal para toda a Rede Lightning, tornando-o um _canal público_. Para anunciar o canal, eles utilizam o protocolo de divulgação (gossip protocol) da Rede Lightning para informar a outros nós sobre a existência, capacidade e taxas do canal.
+
+Anunciar canais publicamente permite que outros nós os usem para roteamento de pagamento, gerando assim também taxas de roteamento para os parceiros de canal.
+
+((("unannounced channels")))Por outro lado, os parceiros do canal podem decidir não anunciar o canal, tornando-o um _canal não anunciado_.
+
+
+[NOTA]
+====
+Você pode ouvir o termo "canal privado" sendo usado para descrever um canal não anunciado. Evitamos usar esse termo porque ele é enganoso e cria uma falsa sensação de privacidade. Embora um canal não anunciado não seja conhecido por outros enquanto estiver em uso, sua existência e capacidade serão reveladas quando o canal for encerrado, pois esses detalhes serão visíveis on-chain na transação final de liquidação. Sua existência também pode vazar de várias outras maneiras, portanto, evitamos chamá-lo de "privado".
+====
+
+Os canais não anunciados ainda são usados para rotear pagamentos, mas apenas pelos nós que estão cientes de sua existência ou que recebem "dicas de roteamento" sobre um caminho que inclui um canal não anunciado.
+
+Quando um canal e sua capacidade são anunciados publicamente usando o protocolo de divulgação (gossip protocol), o anúncio também pode incluir informações sobre o canal (metadados), como suas taxas de roteamento e duração do bloqueio temporal.
+
+Quando novos nós se juntam à Rede Lightning, eles coletam os anúncios de canais propagados por meio do protocolo de divulgação (gossip protocol) de seus pares, construindo um mapa interno da Rede Lightning. Esse mapa pode ser usado para encontrar caminhos para pagamentos, conectando canais de ponta a ponta.
+
+==== Fechando o Canal
+
+((("closing the channel", id="ix_03_how_ln_works-asciidoc3", range="startofrange")))((("payment channel","closing the channel", id="ix_03_how_ln_works-asciidoc4", range="startofrange")))A melhor maneira de fechar um canal é... não fechá-lo!
+Abrir e fechar canais requer uma transação on-chain, o que implica em taxas de transação.
+Portanto, é melhor manter os canais abertos o maior tempo possível.
+Você pode continuar usando seu canal para fazer e encaminhar pagamentos, desde que tenha capacidade suficiente em sua extremidade do canal.
+Mas mesmo que você envie todo o saldo para a outra extremidade do canal, você ainda pode usar o canal para receber pagamentos do seu parceiro de canal.
+Esse conceito de usar um canal em uma direção e depois usá-lo na direção oposta é chamado de "rebalanceamento" e examinaremos em mais detalhes em outro capítulo.
+Ao fazer o rebalanceamento de um canal, ele pode ser mantido aberto por um período praticamente indefinido e usado para um número essencialmente ilimitado de pagamentos.
+
+
+No entanto, às vezes, fechar um canal é desejável ou necessário. Por exemplo:
+
+* Você deseja reduzir o saldo mantido em seus canais Lightning por motivos de segurança e quer enviar fundos para "armazenamento a frio" (cold storage).
+* Seu parceiro de canal fica inativo por um longo período de tempo e você não consegue mais usar o canal.
+* O canal não está sendo usado com frequência porque seu parceiro de canal não é um nó bem conectado, então você deseja usar os fundos para outro canal com um nó melhor conectado.
+* Seu parceiro de canal violou o protocolo, seja devido a um erro de software ou intencionalmente, forçando você a fechar o canal para proteger seus fundos.
+
+Existem três maneiras de fechar um canal de pagamento:
+
+* Fechamento mútuo (o jeito bom)
+* Fechamento forçado (o jeito ruim)
+* Quebra de protocolo (o jeito feio)
+
+Cada um desses métodos é útil para circunstâncias diferentes, as quais exploraremos nas próximas seções deste capítulo.
+Por exemplo, se seu parceiro de canal estiver offline, você não poderá seguir "o caminho ideal" porque um fechamento mútuo não pode ser feito sem um parceiro cooperativo.
+Geralmente, o seu software LN selecionará automaticamente o melhor mecanismo de fechamento disponível de acordo com as circunstâncias.
+
+===== Fechamento mútuo (o jeito bom)
+
+((("closing the channel","mutual close")))((("mutual close")))O fechamento mútuo ocorre quando ambos os parceiros do canal concordam em fechar o canal e é o método preferido de fechamento de canal.
+
+Quando você decide que deseja fechar um canal, seu nó LN informará seu parceiro de canal sobre sua intenção.
+Agora, tanto o seu nó quanto o nó do parceiro de canal trabalham juntos para fechar o canal.
+Nenhuma nova tentativa de roteamento será aceita por qualquer um dos parceiros do canal, e quaisquer tentativas de roteamento em andamento serão resolvidas ou removidas após o tempo limite expirar.
+Finalizar as tentativas de roteamento leva tempo, portanto, um fechamento mútuo também pode levar algum tempo para ser concluído.
+
+((("closing transactions")))Uma vez que não haja mais tentativas de roteamento pendentes, os nós cooperam para preparar uma _transação de fechamento_ (closing transaction).
+Essa transação é semelhante à transação de compromisso: ela codifica o último saldo do canal, mas as saídas NÃO estão sujeitas a um bloqueio temporal (timelock).
+
+As taxas da transação on-chain para a transação de fechamento são pagas pelo parceiro do canal que abriu o canal, e não pela pessoa que iniciou o procedimento de fechamento.
+Usando o estimador de taxa on-chain, os parceiros do canal concordam com a taxa apropriada e ambos assinam a transação de fechamento.
+
+Uma vez que a transação de fechamento é transmitida e confirmada pela rede Bitcoin, o canal é efetivamente fechado e cada parceiro do canal já recebeu sua parte do saldo do canal.
+Apesar do tempo de espera, um fechamento mútuo geralmente é mais rápido do que um fechamento forçado.
+
+
+===== Fechamento forçado (o jeito ruim)
+
+((("closing the channel","force close")))((("force close")))Um fechamento forçado ocorre quando um dos parceiros do canal tenta fechar um canal sem o consentimento do outro parceiro do canal.
+
+Isso geralmente acontece quando um dos parceiros do canal está inacessível, portanto, um fechamento mútuo não é possível.
+Nesse caso, você iniciaria um fechamento forçado para fechar unilateralmente o canal e "liberar" os fundos.
+
+Para iniciar um fechamento forçado, você pode simplesmente publicar a última transação de compromisso que seu nó possui.
+Afinal, para isso servem as transações de compromisso.&#x2014;elas oferecem uma garantia de que você não precisa confiar em seu parceiro de canal para recuperar o saldo do seu canal.
+
+((("commitment transactions","during force close")))Uma vez que você transmita a última transação de compromisso para a rede Bitcoin e ela seja confirmada, ela criará duas saídas gastáveis, uma para você e outra para seu parceiro.
+Conforme discutimos anteriormente, a rede Bitcoin não tem como saber se essa foi a transação de compromisso mais recente ou uma antiga que foi publicada para roubar do seu parceiro.
+Portanto, essa transação de compromisso dará uma pequena vantagem ao seu parceiro.
+O parceiro que iniciou o fechamento forçado terá sua saída sujeita a um bloqueio temporal, enquanto a saída do outro parceiro será gasta imediatamente.
+No caso de você transmitir uma transação de compromisso anterior, o atraso de bloqueio temporal dá ao seu parceiro a oportunidade de contestar a transação usando o segredo de revogação e puni-lo por tentativa de trapaça.
+
+Ao publicar uma transação de compromisso durante um fechamento forçado, as taxas on-chain serão mais altas do que em um fechamento mútuo por várias razões:
+
+. Quando a transação de compromisso foi negociada, os parceiros do canal não sabiam quanto seriam as taxas on-chain no momento futuro em que a transação seria transmitida. Como as taxas não podem ser alteradas sem alterar as saídas da transação de compromisso (o que requer ambas as assinaturas), e como o fechamento forçado ocorre quando um dos parceiros do canal não está disponível para assinar, os desenvolvedores do protocolo decidiram ser muito generosos com a taxa de taxa incluída nas transações de compromisso. Ela pode ser até cinco vezes maior do que as estimativas de taxa sugerem no momento em que a transação de compromisso é negociada.
+. A transação de compromisso inclui saídas adicionais para quaisquer tentativas de roteamento pendentes usando contratos de bloqueio temporal por hash (HTLC), o que torna a transação de compromisso maior (em termos de bytes) do que uma transação de fechamento mútuo. Transações maiores incorrem em taxas mais altas.
+. Todas as tentativas de roteamento pendentes terão que ser resolvidas on-chain, o que causa transações adicionais na cadeia de blocos.
+
+[NOTA]
+====
+Contratos de bloqueio temporal por hash, ou hash-time-locked contracts (HTLCs) serão abordados em detalhes em <<htlcs>>.
+Por enquanto, vamos considerar que esses são pagamentos que são roteados pela Rede Lightning, em vez de pagamentos feitos diretamente entre os dois parceiros do canal.
+Esses HTLCs são incluídos como saídas adicionais nas transações de compromisso, aumentando assim o tamanho da transação e as taxas on-chain.
+====
+
+Em geral, não é recomendado fazer um fechamento forçado, a menos que seja absolutamente necessário.
+Seus fundos ficarão bloqueados por mais tempo e a pessoa que abriu o canal terá que pagar taxas mais altas.
+Além disso, você pode ter que pagar taxas on-chain para abortar ou resolver tentativas de roteamento, mesmo se você não tiver aberto o canal.
+
+Se você conhece o parceiro do canal, você pode considerar entrar em contato com essa pessoa ou empresa para perguntar por que o nó Lightning deles está inativo e solicitar que o reiniciem para que vocês possam realizar um fechamento mútuo do canal.
+
+Você deve considerar um fechamento forçado apenas como último recurso.
+
+===== Quebra de protocolo (o jeito feio)
+
+((("closing the channel","protocol breach")))((("protocol breach")))Uma violação de protocolo ocorre quando seu parceiro de canal tenta enganá-lo, seja intencionalmente ou não, publicando uma transação de compromisso desatualizada na cadeia de blocos do Bitcoin, essencialmente iniciando um fechamento forçado (desonesto) do lado dele.
+
+Seu nó deve estar online e monitorando novos blocos e transações na blockchain do Bitcoin para detectar isso.
+
+Porque o pagamento do seu parceiro de canal estará sujeito a um bloqueio temporal, seu nó tem algum tempo para agir e detectar uma violação de protocolo e publicar uma ((("punishment transaction")))_transação de punição_ (punishment transaction) antes que o bloqueio temporal expire. 
+
+Se você detectar com sucesso a violação de protocolo e aplicar a penalidade, você receberá todos os fundos no canal, incluindo os fundos do seu parceiro de canal.
+
+Nesse cenário, o fechamento do canal será bastante rápido.
+Você terá que pagar taxas on-chain para publicar a transação de penalidade, mas seu nó pode definir essas taxas de acordo com a estimativa de taxas e evitar pagar em excesso.
+Geralmente, você desejará pagar taxas mais altas para garantir a confirmação o mais rápido possível.
+No entanto, como você eventualmente receberá todos os fundos do trapaceiro, é essencialmente o trapaceiro quem pagará por essa transação.
+
+Se você não conseguir detectar a violação de protocolo e o bloqueio temporal expirar, você receberá apenas os fundos alocados a você pela transação de compromisso que seu parceiro publicou.
+Quaisquer fundos que você receber depois disso terão sido roubados pelo seu parceiro.
+Se houver algum saldo alocado para você, você terá que pagar taxas na cadeia de blocos (on-chain) para coletar esse saldo.
+
+Assim como em um fechamento forçado, todas as tentativas de roteamento pendentes também terão que ser resolvidas na transação de compromisso.
+
+Uma violação de protocolo pode ser executada mais rapidamente do que um fechamento mútuo porque você não precisa esperar para negociar um fechamento com seu parceiro, e mais rapidamente do que um fechamento forçado porque você não precisa esperar o bloqueio temporal expirar.
+
+A teoria dos jogos prevê que trapacear não é uma estratégia atraente porque é fácil detectar um trapaceiro, e o trapaceiro corre o risco de perder _todos_ os seus fundos, enquanto tem a chance de ganhar apenas o que tinha em um estado anterior.
+Além disso, à medida que a Rede Lightning amadurece e as torres de observação (watchtowers) se tornam amplamente disponíveis, os trapaceiros serão detectáveis por uma terceira parte, mesmo se o parceiro do canal que que foi enganado estiver offline.
+
+Portanto, não recomendamos trapacear.
+No entanto, recomendamos que qualquer pessoa que pegue um trapaceiro o puna tomando seus fundos.
+
+Então, como detectar um trapaceiro ou uma violação de protocolo em suas atividades diárias?
+Você faz isso executando um software que monitora a blockchain pública do Bitcoin em busca de transações on-chain que correspondam a quaisquer transações de compromisso para qualquer um dos seus canais.
+Este software é um dos três tipos:
+
+* Um nó Lightning devidamente mantido, funcionando 24 horas por dia, 7 dias por semana
+* Um nó de torre de vigia de propósito único que você executa para monitorar seus canais
+Um nó watchtower de terceiros ao qual você paga para monitorar seus canais
+
+Lembre-se de que a transação de compromisso tem um período de tempo limite especificado em um determinado número de blocos, com um máximo de 2.016 blocos.
+Desde que você execute seu nó Lightning pelo menos uma vez antes do período de tempo limite ser alcançado, ele detectará todas as tentativas de trapaça.
+Não é aconselhável correr esse tipo de risco; é importante manter um nó bem-mantido em execução de forma contínua (see <<continuous_operation>>).(((range="endofrange", startref="ix_03_how_ln_works-asciidoc4")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc3")))
+
+=== Faturas (Invoices)
+
+((("Lightning invoices", id="ix_03_how_ln_works-asciidoc5", range="startofrange")))A maioria dos pagamentos na Lightning Network começa com uma fatura, gerada pelo destinatário do pagamento. No nosso exemplo anterior, Bob cria uma fatura para solicitar um pagamento de Alice.
+
+[NOTA]
+====
+Existe uma maneira de enviar um pagamento não solicitado sem uma fatura, usando uma solução alternativa no protocolo chamada +keysend+. Vamos examinar isso.  <<keysend>>.
+====
+
+Uma fatura é uma simples instrução de pagamento que contém informações como um identificador único de pagamento (chamado de "payment hash"), um destinatário, um valor e uma descrição de texto opcional.
+
+((("payment hash")))A parte mais importante da fatura é o payment hash (hash de pagamento), que permite que o pagamento percorra vários canais de forma _atômica_. Em ciência da computação, atômico significa que uma ação ou mudança de estado é concluída com êxito ou não é concluída de forma alguma&#x2014;não há possibilidade de um estado intermediário ou ação parcial. Na Lightning Network, isso significa que o pagamento percorre todo o caminho ou falha completamente. Não é possível que seja concluído parcialmente, de forma que um nó intermediário no caminho possa receber o pagamento e mantê-lo.
+Não existe algo como um "pagamento parcial" ou "pagamento parcialmente bem-sucedido".
+
+As faturas não são comunicadas através da Lightning Network. Em vez disso, elas são comunicadas "out of band" (fora da banda) usando qualquer outro mecanismo de comunicação. Isso é semelhante à forma como endereços de Bitcoin são comunicados a remetentes fora da rede Bitcoin: como um código QR, por e-mail ou mensagem de texto. Por exemplo, Bob pode apresentar uma fatura Lightning para Alice como um código QR, por e-mail ou por qualquer outro canal de mensagem.
+
+As faturas geralmente são codificadas como uma longa sequência codificada em __bech32__ ou como um código QR, para serem escaneadas por uma carteira Lightning em um smartphone. A fatura contém a quantidade de bitcoin solicitada e uma assinatura do destinatário. O remetente usa a assinatura para extrair a chave pública (também conhecida como ID do nó) do destinatário, para que o remetente saiba para onde enviar o pagamento.
+
+((("Bitcoin–Lightning Network comparisons","addresses versus invoices")))Você notou como isso contrasta com Bitcoin e como termos diferentes são usados? No Bitcoin, o destinatário fornece um endereço ao remetente. Na Lightning, o destinatário cria uma fatura e envia-a ao remetente. No Bitcoin, o remetente envia fundos para um endereço. Na Lightning, o remetente paga uma fatura e o pagamento é roteado para o destinatário. O Bitcoin é baseado no conceito de um "endereço", enquanto a Lightning é uma rede de pagamento baseada no conceito de uma "fatura". No Bitcoin, criamos uma "transação", enquanto na Lightning enviamos um "pagamento".
+
+==== Hash de Pagamento e Pré-Imagem
+
+((("Lightning invoices","payment hash/preimage")))A parte mais importante da fatura é o _payment hash_. Ao construir a fatura, Bob criará esse _hash de pagamento_ da seguinte forma:
+
+1. ((("payment secret (preimage)")))((("preimage (payment secret)")))Bob escolhe um número aleatório _r_. Esse número aleatório é chamado de _preimage_ (pré-imagem) ou _payment secret_ (segredo de pagamento).
+2. Bob usa SHA-256 para calcular o hash _H_ de _r_, chamado de _payment hash_: pass:[<br/>]_H_ = SHA-256(_r_).
+
+[NOTA]
+====
+O termo _pré-imagem_ vem da matemática. Em qualquer função pass:[<span class="keep-together"><em>y</em> = <em>f</em>(<em>x</em>)</span>], o conjunto de entradas que produzem um determinado valor _y_ são chamados de preimagem de _y_. Nesse caso, a função é o algoritmo de hash SHA-256, e qualquer valor _r_ que produza o hash _H_ é chamado de pré-imagem.
+====
+
+Não há uma maneira conhecida de encontrar a inversa do SHA-256 (ou seja, calcular uma pré-imagem a partir de um hash). Apenas Bob conhece o valor _r_, então é o segredo de Bob. Mas uma vez que Bob revela _r_, qualquer pessoa que tenha o hash _H_ pode verificar se _r_ é o segredo correto, calculando SHA-256(_r_) e verificando se corresponde a _H_.
+
+O processo de pagamento da Lightning Network só é seguro se _r_ for escolhido completamente aleatoriamente e não for previsível. Essa segurança se baseia no fato de que funções de hash não podem ser invertidas ou quebradas por força bruta de forma viável, e, portanto, ninguém pode encontrar _r_ a partir de _H_.
+
+==== Metadados Adicionais
+
+((("Lightning invoices","additional metadata")))((("metadata, Lightning invoices and")))As faturas podem opcionalmente incluir outros metadados úteis, como uma breve descrição em texto. Se um usuário tiver várias faturas para pagar, o usuário pode ler a descrição e ser lembrado do que se trata a fatura.
+
+((("routing hints")))A fatura também pode incluir algumas "dicas de roteamento" (_routing hints_), que permitem ao remetente usar canais não anunciados para construir uma rota até o destinatário. As dicas de roteamento também podem ser usadas para sugerir canais públicos, por exemplo, canais conhecidos pelo destinatário por terem capacidade de entrada suficiente para rotear o pagamento.
+
+Caso o nó Lightning do remetente não consiga enviar o pagamento pela Lightning Network, as faturas podem opcionalmente incluir um endereço Bitcoin on-chain como alternativa.
+
+[NOTA]
+====
+Embora sempre seja possível "reverter" (fall back) para uma transação Bitcoin on-chain, na verdade é melhor abrir um novo canal com o destinatário em vez disso. Se você precisar pagar taxas on-chain para fazer um pagamento, é melhor utilizar essas taxas para abrir um canal e fazer o pagamento pela Lightning. Após o pagamento ser feito, você terá um canal aberto com liquidez no lado do destinatário, que poderá ser utilizado para rotear pagamentos de volta ao seu nó Lightning no futuro. Uma transação on-chain oferece um pagamento e um canal para uso futuro.
+====
+
+
+As faturas da Lightning contêm uma data de expiração. Como o destinatário precisa manter a _pré-imagem_ _r_ para cada fatura emitida, é útil ter faturas com prazo de validade para que esses _pré-imagens_ não precisem ser mantidas para sempre. Uma vez que uma fatura expire ou seja paga, o destinatário pode descartar a _pré-image_.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc5")))
+
+=== Entregando o Pagamento
+
+((("Lightning Network (generally)","delivering payment", id="ix_03_how_ln_works-asciidoc6", range="startofrange")))((("payment","delivering", id="ix_03_how_ln_works-asciidoc7", range="startofrange")))((("payment delivery", seealso="pathfinding", id="ix_03_how_ln_works-asciidoc8", range="startofrange")))Vimos como o destinatário cria uma fatura que contém um _payment hash_. Esse _payment hash_ será usado para mover o pagamento através de uma série de canais de pagamento, do remetente ao destinatário, mesmo que eles não tenham um canal de pagamento direto entre eles.
+
+Nas próximas seções, vamos mergulhar nas ideias e métodos que estão sendo utilizados para efetuar um pagamento na Lightning Network e utilizar todos os conceitos que apresentamos até agora.
+
+Primeiro, vamos analisar o protocolo de comunicação da Lightning Network.
+
+==== O Protocolo de Divulgação Ponto-a-Ponto
+
+((("gossip protocol","peer-to-peer", id="ix_03_how_ln_works-asciidoc9", range="startofrange")))((("payment delivery","peer-to-peer gossip protocol", id="ix_03_how_ln_works-asciidoc10", range="startofrange")))((("peer-to-peer gossip protocol", id="ix_03_how_ln_works-asciidoc11", range="startofrange")))Como mencionado anteriormente, quando um canal de pagamento é construído, os parceiros do canal têm a opção de torná-lo público, anunciando sua existência e detalhes para toda a Lightning Network.
+
+Os anúncios de canais são comunicados por meio de um protocolo de divulgação (_gossip protocol_) ponto a ponto. Um protocolo ponto a ponto é um protocolo de comunicação no qual cada nó se conecta a uma seleção aleatória de outros nós na rede, geralmente via TCP/IP. Cada um dos nós que está diretamente conectado (via TCP/IP) ao seu nó é chamado de seus "pares" (_peers_). Seu nó, por sua vez, é um dos "pares" deles. É importante observar que quando dizemos que seu nó está conectado a outros "pares", não significa que você possui canais de pagamento, mas apenas que você está conectado por meio do protocolo de divulgação.
+
+((("channel_announcement message","peer-to-peer gossip protocol and")))Após abrir um canal, um nó pode optar por enviar um anúncio do canal por meio da mensagem `channel_announcement` para seus pares.
+Cada par valida as informações da mensagem `channel_announcement` e verifica se a transação de financiamento está confirmada na blockchain do Bitcoin.
+Após a verificação, o nó encaminhará a mensagem de divulgação para seus próprios pares, e eles a encaminharão para seus pares e assim por diante, espalhando o anúncio por toda a rede.
+Para evitar comunicação excessiva, o anúncio do canal é encaminhado por cada nó somente se ele ainda não tiver encaminhado esse anúncio anteriormente.
+
+((("node_announcement message","peer-to-peer gossip protocol and")))O protocolo de divulgação também é usado para anunciar informações sobre nós conhecidos com a mensagem `node_announcement`.
+Para que essa mensagem seja encaminhada, um nó deve ter pelo menos um canal público anunciado no protocolo de divulgação, mais uma vez para evitar tráfego excessivo de comunicação.
+
+Os canais de pagamento possuem vários metadados que são úteis para outros participantes da rede.
+Esses metadados são usados principalmente para tomar decisões de roteamento.
+((("channel_update message")))Como os nós podem ocasionalmente alterar os metadados de seus canais, essas informações são compartilhadas em uma mensagem `channel_update`.
+Essas mensagens serão encaminhadas aproximadamente quatro vezes por dia (por canal) para evitar uma comunicação excessiva.
+O protocolo de divulgação também possui uma variedade de consultas e mensagens para sincronizar inicialmente um nó com a visão da rede ou para atualizar a visão do nó após ficar offline por um tempo.
+
+Um grande desafio para os participantes da Lightning Network é que as informações de topologia compartilhadas pelo protocolo de divulgação são apenas parciais.
+Por exemplo, a capacidade dos canais de pagamento é compartilhada no protocolo de divulgação por meio da mensagem [.keep-together]#`channel_announcement`#.
+No entanto, essa informação não é tão útil quanto a distribuição real da capacidade em termos do saldo local entre os dois parceiros do canal.
+Um nó só pode encaminhar a quantidade de bitcoin que ele realmente possui (saldo local) dentro desse canal.
+
+Embora a Lightning Network pudesse ter sido projetada para compartilhar informações de saldo dos canais e uma topologia precisa, isso não foi feito por várias razões:
+
+* Para proteger a privacidade dos usuários, a rede não divulga todas as transações financeiras e pagamentos. Atualizações de saldo do canal revelariam que um pagamento foi transferido pelo canal. Essas informações poderiam ser correlacionadas para revelar todas as origens e destinos de pagamentos.
+
+* Para escalar a quantidade de pagamentos que podem ser realizados na Lightning Network. Lembre-se de que a Lightning Network foi criada, em primeiro lugar, porque notificar cada participante sobre cada pagamento não escala bem. Portanto, a Lightning Network não pode ser projetada de forma a compartilhar atualizações de saldo do canal entre os participantes.
+
+* A Lightning Network é um sistema dinâmico. Ela muda constantemente e com frequência. Novos nós são adicionados, outros nós são desligados, saldos mudam, etc. Mesmo que tudo seja sempre comunicado, as informações serão válidas apenas por um curto período de tempo. Na verdade, as informações frequentemente estão desatualizadas no momento em que são recebidas.
+
+Vamos examinar os detalhes do protocolo de divulgação em um capítulo posterior.
+
+Por enquanto, é importante apenas saber que o protocolo de divulgação existe e que ele é usado para compartilhar informações de topologia da Lightning Network.
+Essas informações de topologia são cruciais para a entrega de pagamentos por meio da rede de canais de pagamento.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc11")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc10")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc9")))
+
+
+==== Descobrindo o Caminho e Roteamento
+
+((("pathfinding")))((("payment delivery","pathfinding and routing")))((("routing","payment delivery and")))Pagamentos na Lightning Network são encaminhados ao longo de um _caminho_ formado por canais que conectam um participante a outro, desde a origem do pagamento até o destino do pagamento. O processo de encontrar um caminho da origem ao destino é chamado de _descoberta de caminho_ (pathfinding). O processo de usar esse caminho para efetuar o pagamento é chamado de _roteamento_ (routing).
+
+[NOTA]
+====
+Uma crítica frequente à Lightning Network é que o roteamento não está resolvido, ou até mesmo que é um problema "insolúvel". Na verdade, o roteamento é trivial. A descoberta de caminho, por outro lado, é um problema difícil. Os dois termos frequentemente são confundidos e precisam ser claramente definidos para identificar qual problema estamos tentando resolver.
+====
+
+Como veremos a seguir, a Lightning Network atualmente utiliza um protocolo _baseado em origem_ para a descoberta de caminho e um protocolo _onion-routed_ para o roteamento de pagamentos. Baseado em origem significa que o remetente do pagamento precisa encontrar um caminho através da rede até o destino desejado. Onion-routed significa que os elementos do caminho são em camadas (como uma cebola), com cada camada criptografada de forma que só possa ser visualizada por um nó de cada vez. Discutiremos o roteamento em camadas na próxima seção.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc8")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc7")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc6")))
+
+=== Descoberta de Caminho Baseada na Origem
+
+((("pathfinding","source-based", id="ix_03_how_ln_works-asciidoc12", range="startofrange")))((("payment delivery","source-based pathfinding", id="ix_03_how_ln_works-asciidoc13", range="startofrange")))((("source-based pathfinding", id="ix_03_how_ln_works-asciidoc14", range="startofrange")))Se soubéssemos os saldos exatos de todos os canais, poderíamos facilmente calcular um caminho de pagamento usando qualquer um dos algoritmos de descoberta de caminho padrão ensinados em qualquer aula de ciência da computação. Isso até poderia ser resolvido de uma forma que otimiza as taxas pagas aos nós pelo encaminhamento do pagamento.
+
+No entanto, as informações de equilíbrio de todos os canais não são e não podem ser conhecidas por todos os participantes da rede. Precisamos de estratégias de descoberta de caminhos mais inovadoras.
+
+Com apenas informações parciais sobre a topologia da rede, encontrar caminhos adequados é um desafio real, e pesquisas ativas ainda estão sendo conduzidas nessa área da Lightning Network. O fato de que o problema de busca de caminhos não está "totalmente resolvido" na Lightning Network é um ponto crítico importante em relação à tecnologia.
+
+[NOTA]
+====
+Uma crítica comum ao processo de busca de caminhos na Lightning Network é que ele é insolúvel porque é equivalente ao problema NP-completo (completo em tempo polinomial não determinístico) do ((("traveling salesperson problem")))_caixeiro-viajante_ (TSP, traveling salesperson problem), que é um problema fundamental na teoria da complexidade computacional. Na verdade, a descoberta de caminhos na Lightning não é equivalente ao TSP e se enquadra em uma classe diferente de problemas. Nós solucionamos com sucesso esse tipo de problema (descoberta de caminhos em grafos com informações incompletas) toda vez que pedimos ao Google para nos fornecer direções de carro com evasão de tráfego. Também solucionamos esse problema com sucesso toda vez que roteamos um pagamento na Lightning Network.
+====
+
+O processo de descoberta de caminhos e roteamento pode ser implementado de várias maneiras diferentes, e múltiplos algoritmos de descoberta de caminhos e roteamento podem coexistir na Lightning Network, assim como existem diversos algoritmos de busca de caminhos e roteamento na internet. A busca de caminhos com base na fonte (source-based pathfinding) é uma das muitas soluções possíveis e tem sido bem-sucedida na escala atual da Lightning Network.
+
+A estratégia de descoberta de caminhos atualmente implementada pelos nós da Lightning é tentar iterativamente diferentes caminhos até encontrar um que tenha liquidez suficiente para encaminhar o pagamento. Esse é um processo iterativo de tentativa e erro, até que o sucesso seja alcançado ou nenhum caminho seja encontrado. O algoritmo atualmente não necessariamente resulta no caminho com as menores taxas. Embora isso não seja ótimo e certamente possa ser aprimorado, até mesmo essa estratégia simplista funciona bastante bem.
+
+Essa "sondagem" é realizada pelo próprio nó ou carteira da Lightning e não é diretamente visível para o usuário.
+O usuário pode perceber que a sondagem está ocorrendo apenas se o pagamento não for concluído instantaneamente.
+
+[NOTA]
+====
+Na internet, utilizamos o Protocolo de Internet e um algoritmo de encaminhamento de IP para encaminhar pacotes de internet do remetente para o destinatário. Embora esses protocolos tenham a propriedade de permitir que os hosts da internet encontrem colaborativamente um caminho para o fluxo de informações pela internet, não podemos reutilizar e adotar esse protocolo para encaminhar pagamentos na Lightning Network. Ao contrário da internet, os pagamentos na Lightning precisam ser _atômicos_, e os saldos dos canais devem permanecer _privados_. Além disso, a capacidade do canal na Lightning muda com frequência, ao contrário da internet, onde a capacidade da conexão é relativamente estática. Essas restrições exigem estratégias pass:[<span class="keep-together">inovadoras</span>].
+====
+
+Claro, descobrir um caminho é trivial se quisermos pagar diretamente nosso parceiro de canal e tivermos saldo suficiente do nosso lado do canal para fazê-lo. Em todos os outros casos, nosso nó utiliza informações do protocolo de divulgação (gossip protocol) para realizar a busca de caminho. Isso inclui os canais de pagamento públicos conhecidos atualmente, os nós conhecidos, a topologia conhecida (como os nós conhecidos estão conectados), as capacidades conhecidas dos canais e as políticas de taxas conhecidas definidas pelos proprietários dos nós.
+
+==== Roteamento de Cebola
+
+((("onion routing protocol")))((("pathfinding","onion routing protocol")))((("payment delivery","onion routing protocol")))A Lightning Network utiliza um protocolo de roteamento de cebola (_onion routing protocol_) semelhante à famosa rede Tor (The Onion Router).
+((("SPHINX Mix Format", seealso="onion routing")))O protocolo de roteamento em camadas usado na Lightning é chamado de _SPHINX Mix Format_,footnote:[George Danezis and Ian Goldberg, "Sphinx: A Compact and Provably Secure Mix Format," in _IEEE Symposium on Security and Privacy_ (New York: IEEE, 2009), 269–282.] que será explicado em detalhes em um capítulo posterior.
+
+[NOTA]
+====
+O formato de roteamento em camadas SPHINX Mix Format usado na Lightning é apenas similar ao roteamento da rede Tor em termos de conceito, mas tanto o protocolo quanto a implementação são completamente diferentes dos usados na rede Tor.
+====
+
+Um pacote de pagamento usado para o roteamento é chamado de "cebola" (onion).footnote:[O termo "cebola" (onion) foi originalmente utilizado pelo projeto Tor. Além disso, a rede Tor também é chamada de rede Onion e o projeto utiliza uma cebola como seu logotipo. O nome do domínio de nível superior (top-level domain name) utilizado pelos serviços Tor na internet é _onion_.]
+
+Vamos usar a analogia da cebola para seguir um pagamento roteado. Em sua rota do remetente do pagamento (pagador) ao destinatário do pagamento (beneficiário), a cebola é passada de nó para nó ao longo do caminho. O remetente constrói toda a cebola, do centro para fora. Primeiro, o remetente cria as informações de pagamento para o destinatário (final) do pagamento e as criptografa com uma camada de criptografia que apenas o destinatário pode decifrar. Em seguida, o remetente envolve essa camada com instruções para o nó no caminho _imediatamente anterior ao destinatário final_ e criptografa com uma camada que apenas aquele nó pode decifrar.
+
+As camadas são construídas com instruções, trabalhando de trás para frente até que todo o caminho seja codificado em camadas. O remetente então entrega a cebola completa ao primeiro nó do caminho, que só pode ler a camada mais externa. Cada nó descasca uma camada, encontra instruções dentro dela revelando o próximo nó no caminho e repassa a cebola. À medida que cada nó descasca uma camada, ele não pode ler o resto da cebola. Tudo o que ele sabe é de onde a cebola acabou de vir e para onde está indo a seguir, sem qualquer indicação sobre quem é o remetente original ou o destinatário final.
+
+Isso continua até que a cebola alcance o destino do pagamento (beneficiário). Em seguida, o nó de destino abre a cebola e descobre que não há mais camadas para decifrar, podendo ler as informações de pagamento contidas no interior.
+
+[NOTA]
+====
+Ao contrário de uma cebola real, ao descascar cada camada, os nós adicionam algum preenchimento criptografado para manter o tamanho da cebola igual para o próximo nó. Como veremos, isso torna impossível para qualquer um dos nós intermediários saber qualquer informação sobre o tamanho (comprimento) do caminho, quantos nós estão envolvidos no roteamento, quantos nós os precederam ou quantos os seguem. Isso aumenta a privacidade ao evitar ataques de análise de tráfego triviais.
+====
+
+O protocolo de roteamento em camadas usado na Lightning tem as seguintes propriedades:
+
+* Um nó intermediário só pode ver em qual canal ele recebeu uma cebola e em qual canal encaminhá-la. Isso significa que nenhum nó de roteamento pode saber quem iniciou o pagamento e para quem o pagamento é destinado. Essa é a propriedade mais importante, que resulta em um alto grau de privacidade.
+
+* As cebolas são pequenas o suficiente para caber em um único pacote TCP/IP e até mesmo em um quadro de camada de enlace (por exemplo, Ethernet). Isso torna a análise de tráfego dos pagamentos significativamente mais difícil, aumentando ainda mais a privacidade.
+
+* As cebolas são construídas de forma que sempre tenham o mesmo comprimento, independentemente da posição do nó de processamento ao longo do caminho. À medida que cada camada é "descascada", a cebola é preenchida com dados criptografados "inúteis" para manter o tamanho da cebola igual. Isso impede que os nós intermediários saibam sua posição no caminho.
+
+* As cebolas possuem um HMAC (código de autenticação de mensagem baseado em hash) para que manipulações das cebolas seja prevenido e praticamente impossível. 
+
+* As cebolas podem ter até aproximadamente 26 saltos, ou camadas de cebola, se preferir. Isso permite caminhos suficientemente longos. O comprimento exato do caminho disponível depende da quantidade de bytes alocados para a carga útil de roteamento em cada salto.
+
+* A criptografia da cebola para cada salto usa chaves de criptografia efêmeras diferentes. Se uma chave (em particular, a chave privada de um nó) vazar em algum momento, um atacante não pode descriptografá-las. Em termos mais simples, as chaves nunca são reutilizadas para garantir mais segurança.
+
+* Erros podem ser enviados de volta do nó com erro para o remetente original, usando o mesmo protocolo de roteamento em camadas. As cebolas de erro são indistinguíveis das cebolas de roteamento para observadores externos e nós intermediários. O roteamento de erro permite o método de tentativa e erro "sondagem" (probing) usado para encontrar um caminho que tenha capacidade suficiente para rotear com sucesso um pagamento.
+
+O roteamento em camadas será examinado em detalhes em <<onion_routing>>.
+
+==== Algoritmo de Encaminhamento de Pagamento
+
+((("payment delivery","payment forwarding algorithm")))Depois que o remetente de um pagamento encontra um caminho possível através da rede e constrói uma cebola, o pagamento é encaminhado por cada nó no caminho. Cada nó processa uma camada da cebola e a encaminha para o próximo nó no caminho.
+
+((("update_add_htlc message")))Cada nó intermediário recebe uma mensagem Lightning chamada `update_add_htlc` com um hash de pagamento e uma cebola. O nó intermediário executa uma série de etapas, chamada de _algoritmo de encaminhamento de pagamento_ (payment forwarding algorithm):
+
+. O nó descriptografa a camada externa da cebola e verifica a integridade da mensagem.
+
+. O nó confirma se pode cumprir as dicas de roteamento com base nas taxas do canal e na capacidade disponível no canal de saída.
+
+. O nó trabalha com seu parceiro de canal no canal de entrada (incoming channel) para atualizar o estado do canal.
+
+. O nó adiciona algum preenchimento ao final da cebola para mantê-la em um comprimento constante, uma vez que removeu alguns dados do início.
+
+. O nó segue as dicas de roteamento para encaminhar o pacote de cebola modificado em seu canal de pagamento de saída, enviando também uma mensagem `update_add_htlc` que inclui o mesmo hash de pagamento e a cebola.
+
+. O nó trabalha com seu parceiro de canal no canal de saída para atualizar o estado do canal.
+
+Claro, essas etapas são interrompidas e abortadas se um erro for detectado, e uma mensagem de erro é enviada de volta ao remetente (emissor) da mensagem `update_add_htlc`. A mensagem de erro também é formatada como uma cebola e enviada de volta pelo canal de entrada (incoming channel).
+
+Conforme o erro se propaga retroativamente em cada canal ao longo do caminho, os parceiros de canal removem o pagamento pendente, revertendo o pagamento de maneira oposta à qual ele começou.
+
+Embora a probabilidade de falha de um pagamento seja alta se ele não for concluído rapidamente, um nó nunca deve iniciar outra tentativa de pagamento ao longo de um caminho diferente antes que a cebola retorne com um erro. O remetente pagaria duas vezes se ambas as tentativas de pagamento fossem bem-sucedidas eventualmente.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc14")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc13")))(((range="endofrange", startref="ix_03_how_ln_works-asciidoc12")))
+
+=== Criptografia de Comunicação Ponto a Ponto
+
+((("Lightning Network (generally)","peer-to-peer communication encryption")))((("peer-to-peer communication encryption")))O protocolo LN é principalmente um protocolo ponto-a-ponto entre seus participantes. Como vimos em seções anteriores, existem duas funções sobrepostas na rede, formando duas redes lógicas que juntas são _a Lightning Network_:
+
+1. Uma ampla rede ponto-a-ponto que usa um protocolo de disseminação de informações de topologia (gossip protocol) para propagar informações, em que os pares se conectam aleatoriamente entre si. Os pares nem sempre têm canais de pagamento entre si, então eles nem sempre são parceiros de canal.
+
+2. Uma rede de canais de pagamento entre parceiros de canal. Os parceiros de canal também compartilham informações sobre a topologia, ou seja, são nós pares no protocolo de transmissão.
+
+Toda comunicação entre os pares é enviada por meio de mensagens chamadas mensagens Lightning. Essas mensagens são todas criptografadas, utilizando um framework de comunicação criptográfica ((("Noise Protocol Framework","Lightning messages and")))chamado _Noise Protocol Framework_. O Noise Protocol Framework permite a construção de protocolos de comunicação criptográfica que oferecem autenticação, criptografia, segredo de encaminhamento e privacidade de identidade. O Noise Protocol Framework também é utilizado em diversos sistemas populares de comunicação criptografada de ponta a ponta, como WhatsApp, WireGuard e I2P. Mais informações podem ser encontradas em https://noiseprotocol.org[at the Noise Protocol Framework website].
+
+O uso do Noise Protocol Framework na Lightning Network garante que cada mensagem na rede seja autenticada e criptografada, aumentando a privacidade da rede e sua resistência à análise de tráfego, inspeção profunda de pacotes e espionagem. No entanto, como efeito colateral, isso torna o desenvolvimento e teste do protocolo um pouco complicados, pois não é possível simplesmente observar a rede com uma captura de pacotes ou uma ferramenta de análise de rede, como o Wireshark. Em vez disso, os desenvolvedores têm que usar plug-ins especializados que descriptografam o protocolo a partir da perspectiva de um nó, como o https://github.com/nayutaco/lightning-dissector[_lightning dissector_], um plug-in Wireshark.
+
+=== Pensamentos Sobre Confiança
+((("Lightning Network (generally)","trust and")))((("trust, Lightning Network and")))Desde que uma pessoa siga o protocolo e mantenha seu nó seguro, não há um grande risco de perda de fundos ao participar da Lightning Network.
+No entanto, existe o custo de pagar taxas on-chain ao abrir um canal.
+Qualquer custo deve estar acompanhado de um benefício correspondente.
+No nosso caso, a recompensa para Alice por arcar com o custo de abrir um canal é que Alice pode enviar e, após mover algumas das moedas para a outra extremidade do canal, receber pagamentos em bitcoin na Lightning Network a qualquer momento, além de poder ganhar taxas em bitcoin ao encaminhar pagamentos para outras pessoas.
+Alice está ciente de que, em teoria, Bob pode fechar o canal imediatamente após a abertura, o que resultaria em taxas de fechamento on-chain para Alice.
+Alice precisará ter um pequeno nível de confiança em Bob.
+Se Alice já esteve no Café do Bob e está claro que Bob tem interesse em vender café para ela, então Alice pode confiar em Bob nesse sentido.
+Existem benefícios mútuos tanto para Alice quanto para Bob.
+Alice decide que a recompensa é suficiente para que ela assuma o custo da taxa on-chain para criar um canal com Bob.
+Por outro lado, Alice não abrirá um canal para alguém desconhecido que, sem convite, enviou um e-mail pedindo para abrir um novo canal.
+
+=== Comparação com Bitcoin
+
+((("Bitcoin–Lightning Network comparisons", id="ix_03_how_ln_works-asciidoc15", range="startofrange")))Embora a Lightning Network seja construída em cima do Bitcoin e herde muitas de suas características e propriedades, existem diferenças importantes que os usuários de ambas as redes precisam estar cientes.
+
+Algumas dessas diferenças são diferenças de terminologia. Também existem diferenças arquiteturais e diferenças na experiência do usuário. Nas próximas seções, vamos examinar as diferenças e semelhanças, explicar a terminologia e ajustar nossas expectativas.
+
+==== Endereços Versus Faturas, Transações Versus Pagamentos
+
+((("Bitcoin–Lightning Network comparisons","addresses versus invoices")))((("Bitcoin–Lightning Network comparisons","transactions versus payments")))Em um pagamento típico usando Bitcoin, um usuário recebe um endereço Bitcoin (por exemplo, escaneando um código QR em uma página da web ou recebendo-o em uma mensagem instantânea ou e-mail de um amigo). Em seguida, eles usam sua carteira Bitcoin para criar uma transação e enviar fundos para esse endereço.
+
+Na Lightning Network, o destinatário de um pagamento cria uma fatura (invoice). Uma fatura na Lightning pode ser vista como análoga a um endereço Bitcoin. O destinatário fornece a fatura da Lightning ao remetente, seja como um código QR ou uma sequência de caracteres, assim como um endereço Bitcoin.
+
+O emissor usa sua carteira Lightning para pagar a fatura, copiando o texto da fatura ou escaneando o código QR da fatura. Um pagamento na Lightning é análogo a uma "transação" do Bitcoin.
+
+Existem algumas diferenças na experiência do usuário, no entanto. Um endereço Bitcoin é "reutilizável". Endereços Bitcoin nunca expiram e, se o proprietário do endereço ainda possuir as chaves, os fundos nele contidos estão sempre acessíveis. Um remetente pode enviar qualquer quantidade de bitcoin para um endereço usado anteriormente, e um destinatário pode divulgar um único endereço estático para receber muitos pagamentos. Embora isso vá contra as melhores práticas por motivos de privacidade, é tecnicamente possível e, na verdade, bastante comum.
+
+Na Lightning, no entanto, cada fatura só pode ser usada uma vez para um valor específico de pagamento. Você não pode pagar mais ou menos, não pode usar uma fatura novamente e a fatura tem um tempo de expiração embutido. Na Lightning, o destinatário precisa gerar uma nova fatura para cada pagamento, especificando o valor do pagamento antecipadamente. Há uma exceção a isso, um mecanismo chamado _keysend_, que vamos examinar em <<keysend>>.
+
+==== Selecionando Saídas Versus Encontrando um Caminho
+
+((("Bitcoin–Lightning Network comparisons","selecting outputs versus finding a path")))((("unspent transaction outputs (UTXOs)")))((("UTXOs (unspent transaction outputs)")))Para fazer um pagamento na rede Bitcoin, o remetente precisa consumir uma ou mais saídas de transação não gastas (UTXOs).
+Se um usuário tiver várias UTXOs, eles (ou melhor, sua carteira) precisarão selecionar quais UTXOs enviar.
+Por exemplo, um usuário que faz um pagamento de 1 BTC pode usar uma única saída com valor de 1 BTC, duas saídas com valores de 0,25 BTC e 0,75 BTC, ou quatro saídas com valor de 0,25 BTC cada.
+
+Na Lightning, os pagamentos não exigem que as entradas sejam consumidas. Em vez disso, cada pagamento resulta em uma atualização do saldo do canal, redistribuindo-o entre os dois parceiros do canal. O remetente vivencia isso como "movendo" o saldo do canal de sua extremidade para a outra extremidade, para o seu parceiro de canal. Os pagamentos na Lightning usam uma série de canais para rotear do remetente ao destinatário. Cada um desses canais deve ter capacidade suficiente para rotear o pagamento.
+
+Como muitos canais e caminhos possíveis podem ser usados para fazer um pagamento, a escolha dos canais e caminhos pelo usuário da Lightning é em certa medida análoga à escolha de UTXOs (Unspent Transaction Output) pelo usuário do Bitcoin.
+
+Com tecnologias como pagamentos atômicos multipath (AMP, Atomic Multipath Payments) e pagamentos multipartes (MPP, Multipart Payments), que serão abordadas em capítulos subsequentes, vários caminhos da Lightning podem ser agregados em um único pagamento atômico, assim como várias UTXOs do Bitcoin podem ser agregadas em uma única transação atômica do Bitcoin.
+
+==== Saídas de Troco no Bitcoin versus Ausência de Troco na Lightning
+
+((("Bitcoin–Lightning Network comparisons","change outputs")))Para realizar um pagamento na rede Bitcoin, o remetente precisa consumir uma ou mais saídas de transações não gastas (UTXOs). UTXOs só podem ser gastas integralmente; elas não podem ser divididas e parcialmente gastas. Portanto, se um usuário deseja gastar 0,8 BTC, mas possui apenas uma UTXO de 1 BTC, eles precisam gastar toda a UTXO de 1 BTC, enviando 0,8 BTC para o destinatário e 0,2 BTC de volta para si mesmos como troco. O pagamento de troco de 0,2 BTC cria uma nova UTXO chamada change output, ou "saída de troco."
+
+Na Lightning Network, a transação de financiamento consome algumas UTXOs do Bitcoin, criando uma UTXO multiassinatura para abrir o canal. Uma vez que os bitcoins estão bloqueados dentro desse canal, partes deles podem ser enviadas de ida e volta dentro do canal, sem a necessidade de criar qualquer troco.
+Isso ocorre porque os parceiros do canal simplesmente atualizam o saldo do canal e só criam uma nova UTXO quando o canal é eventualmente fechado usando a transação de fechamento do canal.
+
+==== Taxas de Mineração Versus Taxas de Roteamento
+
+((("Bitcoin–Lightning Network comparisons","mining fees versus routing fees")))Na rede Bitcoin, os usuários pagam taxas aos mineradores para que suas transações sejam incluídas em um bloco.
+Essas taxas são pagas ao minerador que minera aquele bloco específico.
+A quantia da taxa é baseada no _tamanho_ da transação em _bytes_ que a transação está usando em um bloco, bem como na rapidez com que o usuário deseja que essa transação seja minerada.
+Porque os mineradores normalmente mineram as transações mais lucrativas primeiro, um usuário que deseja que sua transação seja minerada imediatamente pagará uma _taxa mais alta_ por byte, enquanto um usuário que não está com pressa pagará uma _taxa mais baixa_ por byte.
+
+Na Lightning Network, os usuários pagam taxas a outros usuários (nós intermediários) para rotear pagamentos através de seus canais.
+Para rotear um pagamento, um nó intermediário precisará movimentar fundos em dois ou mais canais de sua propriedade, além de transmitir os dados para o pagamento do remetente.  Normalmente, o usuário responsável pelo roteamento cobrará do remetente com base no _valor_ do pagamento, tendo estabelecido uma taxa básica mínima  ((("base fee")))_taxa base_ (uma taxa fixa para cada pagamento) e uma ((("fee rate")))_fee rate_ (uma taxa proporcional ao valor do pagamento). Pagamentos de valor mais alto custarão mais para serem roteados, e um mercado de liquidez é formado, onde diferentes usuários cobram diferentes taxas para rotear através de seus canais.
+
+==== Taxas Variáveis Dependendo do Tráfego Versus Taxas Anunciadas
+
+((("Bitcoin–Lightning Network comparisons","varying fees versus announced fees")))Na rede do Bitcoin, os mineradores buscam obter lucro e geralmente incluem o maior número possível de transações em um bloco, respeitando a capacidade máxima do bloco chamada de ((("block weight")))peso do bloco (_block weight_).
+
+((("transaction weight")))Se houver mais transações na fila (chamada de "mempool") do que podem ser incluídas em um bloco, os mineradores começarão minerando as transações que pagam as maiores taxas por unidade (bytes) de peso da transação (_transaction weight_).
+Portanto, quando há muitas transações na fila, os usuários precisam pagar uma taxa mais alta para serem incluídos no próximo bloco, ou então terão que esperar até que haja menos transações na fila.
+Isso naturalmente leva ao surgimento de um mercado de taxas, onde os usuários pagam com base na urgência de terem suas transações incluídas no próximo bloco.
+
+Na rede do Bitcoin, o recurso escasso é o espaço nos blocos. Os usuários do Bitcoin competem pelo espaço nos blocos, e o mercado de taxas do Bitcoin é baseado no espaço disponível nos blocos. Os recursos escassos na Lightning Network são a ((("channel connectivity")))((("channel liquidity")))_liquidez dos canais_ (a capacidade de fundos disponíveis para roteamento nos canais) e a _conectividade dos canais_ (quantos nós bem conectados os canais podem alcançar). Os usuários da Lightning competem pela capacidade pass:[<span class="keep-together">e conectividade</span>]; portanto, o mercado de taxas da Lightning é impulsionado pela capacidade e pass:[<span class="keep-together">conectividade</span>].
+
+Na Lightning Network, os usuários pagam taxas aos usuários que encaminham seus pagamentos. Encaminhar um pagamento, em termos econômicos, nada mais é do que fornecer e atribuir capacidade ao remetente. Naturalmente, os roteadores que cobram taxas mais baixas pela mesma capacidade serão mais atrativos para serem utilizados como rota. Assim, existe um mercado de taxas no qual os roteadores competem entre si pelas taxas que cobram para encaminhar pagamentos por meio de seus canais.
+
+==== Transações Públicas de Bitcoin Versus Pagamentos Relâmpago Privados
+
+((("Bitcoin–Lightning Network comparisons","public Bitcoin transactions versus private Lightning payments")))Na rede do Bitcoin, todas as transações são publicamente visíveis no blockchain do Bitcoin. Embora os endereços envolvidos sejam pseudônimos e geralmente não estejam vinculados a uma identidade, eles ainda são vistos e validados por todos os outros usuários da rede.
+Além disso, empresas de vigilância blockchain coletam e analisam esses dados em massa e os vendem para partes interessadas, como empresas privadas, governos e agências de inteligência.
+
+Por outro lado, os pagamentos LN são praticamente privados. Geralmente, apenas o remetente e o destinatário têm conhecimento completo da origem, destino e valor transacionado em um determinado pagamento. Além disso, o destinatário pode nem mesmo saber a origem do pagamento. Como os pagamentos são roteados em camadas (onion routed), os usuários que roteiam o pagamento têm conhecimento apenas do valor do pagamento, sem poder determinar a origem nem o destino.
+
+Em resumo, as transações do Bitcoin são transmitidas publicamente e armazenadas permanentemente. Os pagamentos na Lightning são executados entre um número limitado de pares selecionados, e as informações sobre eles são armazenadas de forma privada apenas até o fechamento do canal. Criar ferramentas de vigilância em massa e análise equivalentes às usadas no Bitcoin será muito mais difícil na Lightning.
+
+==== Aguardando Confirmações Versus Liquidação Instantânea
+
+((("Bitcoin–Lightning Network comparisons","waiting for confirmations versus instant settlement")))Na rede do Bitcoin, as transações são apenas confirmadas quando são incluídas em um bloco, sendo assim, elas são consideradas "confirmadas" nesse bloco. À medida que mais blocos são minerados, a transação adquire mais "confirmações" e é considerada mais segura.
+
+Na Lightning Network, as confirmações são relevantes apenas para a abertura e fechamento dos canais na blockchain. Uma vez que uma transação de financiamento atinge um número adequado de confirmações (por exemplo, 3), os parceiros do canal consideram o canal aberto. Como os bitcoin no canal são garantidos por um contrato inteligente que gerencia esse canal, os pagamentos são liquidados _instantaneamente_ assim que são recebidos pelo destinatário final.
+Em termos práticos, a liquidação instantânea significa que os pagamentos na Lightning Network levam apenas alguns segundos para serem executados e liquidados. Assim como no Bitcoin, os pagamentos na Lightning não são reversíveis.
+
+Por fim, quando o canal é fechado, uma transação é realizada na rede do Bitcoin; assim que essa transação for confirmada, o canal é considerado fechado.
+
+==== Enviando Valores Arbitrários Versus Restrições de Capacidade
+
+((("Bitcoin–Lightning Network comparisons","sending arbitrary amounts versus capacity restrictions")))Na rede do Bitcoin, um usuário pode enviar qualquer quantidade de bitcoin que possua para outro usuário, sem restrições de capacidade. Uma única transação teoricamente pode enviar até 21 milhões de bitcoin como pagamento.
+
+Na Lightning Network, um usuário só pode enviar a quantidade de bitcoin que atualmente existe do seu lado em um canal específico para o parceiro do canal. Por exemplo, se um usuário possui um canal com 0,4 BTC do seu lado e outro canal com 0,2 BTC do seu lado, o máximo que ele pode enviar em um único pagamento é de 0,4 BTC. Isso é válido independentemente da quantidade de bitcoin que o usuário tenha atualmente em sua carteira de Bitcoin.
+
+((("multipart payments (MPP)")))Pagamentos em várias partes (Multipart Payments, MPP) é um recurso que, no exemplo anterior, permite ao usuário combinar seus canais de 0,4 BTC e 0,2 BTC para enviar no máximo 0,6 BTC com um pagamento. Os MPPs estão sendo testados na Lightning Network e espera-se que estejam amplamente disponíveis e usados ​​quando este livro for concluído. Para mais detalhes sobre o MPP, veja <<mpp>>.
+
+Se o pagamento for roteado, cada nó de roteamento ao longo do caminho de roteamento deve ter canais com capacidade pelo menos igual ao valor do pagamento sendo roteado. Isso deve ser verdadeiro para cada canal individual pelo qual o pagamento é roteado. A capacidade do canal de menor capacidade em um caminho define o limite superior para a capacidade de todo o caminho.
+
+Portanto, a capacidade e a conectividade são recursos críticos e escassos na Lightning Network.
+
+==== Incentivos para Pagamentos de Grande Valor Versus Pagamentos de Pequeno Valor
+
+((("Bitcoin–Lightning Network comparisons","fee structures")))((("fees","Bitcoin–Lightning Network comparisons")))A estrutura de taxas no Bitcoin é independente do valor da transação.
+Uma transação de $1 milhão tem a mesma taxa que uma transação de $1 no Bitcoin, desde que possuam um tamanho de transação semelhante, em bytes (mais especificamente, "bytes virtuais" após o SegWit [Segregated Witness protocol]).
+Na Lightning Network, a taxa é composta por uma taxa base fixa, além de uma porcentagem do valor da transação.
+Portanto, na Lightning Network, a taxa de pagamento aumenta com o valor do pagamento.
+Essas estruturas de taxas opostas criam incentivos diferentes e levam a diferentes padrões de uso em relação ao valor das transações.
+Uma transação de maior valor será mais barata no Bitcoin; portanto, os usuários preferirão o Bitcoin para transações de grande valor. Da mesma forma, no outro extremo da escala, os usuários preferirão a Lightning para transações de pequeno valor.
+
+==== Utilizando a Blockchain como um Livro-Razão Versus um Sistema Judiciário
+
+((("Bitcoin–Lightning Network comparisons","blockchain: ledger versus court system")))Na rede do Bitcoin, toda transação é eventualmente registrada em um bloco na blockchain.
+A blockchain, dessa forma, forma um histórico completo de todas as transações desde a criação do Bitcoin, e uma maneira de auditar completamente todos os bitcoin em existência.
+Uma vez que uma transação é incluída na blockchain, ela é final.
+Assim, nenhuma disputa pode surgir e é inequívoca a quantidade de bitcoin controlada por um determinado endereço em um ponto específico da blockchain.
+
+Na Lightning Network, o saldo em um canal em um determinado momento é conhecido apenas pelos dois parceiros do canal e só se torna visível para o restante da rede quando o canal é fechado.
+Quando o canal é fechado, o saldo final do canal é enviado para a blockchain do Bitcoin, e cada parceiro recebe sua parte dos bitcoin naquele canal.
+Por exemplo, se o saldo inicial foi de 1 BTC pago por Alice, e Alice fez um pagamento de 0,3 BTC para Bob, então o saldo final do canal será de 0,7 BTC para Alice e 0,3 BTC para Bob.
+Se Alice tentar trapacear ao enviar o estado inicial do canal para a blockchain do Bitcoin, com 1 BTC para Alice e 0 BTC para Bob, então Bob pode retaliar enviando o verdadeiro estado final do canal, além de criar uma transação de penalidade que lhe dá todos os bitcoin no canal.
+Para a Lightning Network, a blockchain do Bitcoin atua como um sistema judicial.
+Como um juiz robótico, o Bitcoin registra os saldos inicial e final de cada canal e aprova penalidades se uma das partes tentar trapacear.
+
+==== Offline Versus Online, Assíncrono Versus Síncrono
+
+((("Bitcoin–Lightning Network comparisons","minimum payment size: satoshi versus millisatoshi")))((("Bitcoin–Lightning Network comparisons","payment activity: asynchronous versus synchronous")))((("millisatoshi")))((("satoshi")))Quando um usuário de Bitcoin envia fundos para um endereço de destino, eles não precisam saber nada sobre o destinatário. O destinatário pode estar offline ou online, e nenhuma interação entre remetente e destinatário é necessária. A interação ocorre entre o remetente e a blockchain do Bitcoin. Receber bitcoin na blockchain do Bitcoin é uma atividade _passiva_ e _assíncrona_ que não requer nenhuma interação por parte do destinatário, nem que o destinatário esteja online a qualquer momento. Os endereços de Bitcoin podem até ser gerados offline e nunca são "registrados" na rede do Bitcoin. Somente gastar bitcoin requer interação.
+
+Na Lightning Network, o destinatário deve estar online para concluir o pagamento antes que ele expire.
+O destinatário deve executar um nó ou ter alguém que execute um nó em seu nome (um terceiro custodiante). Para sermos exatos, tanto o nó do remetente quanto o nó do destinatário devem estar online no momento do pagamento e devem se coordenar. Receber um pagamento na Lightning Network é uma atividade _ativa_ e _síncrona_ entre remetente e destinatário, sem a participação da maioria da Lightning Network ou da rede Bitcoin (exceto pelos nós intermediários de roteamento, se houver).
+
+A natureza síncrona e sempre online da Lightning Network é provavelmente a maior diferença na experiência do usuário, e isso muitas vezes confunde os usuários que estão acostumados com o Bitcoin.
+
+==== Satoshis Versus Milisatoshis
+
+Na rede do Bitcoin, a menor unidade é um _satoshi_, que não pode ser dividido ainda mais. A Lightning Network é um pouco mais flexível, e os nós da Lightning trabalham com _millisatoshis_ (milésimos de um satoshi). Isso permite o envio de pagamentos minúsculos via Lightning. Um pagamento de um único millisatoshi pode ser enviado através de um canal de pagamento, uma quantia tão pequena que pode ser caracterizada corretamente como um _nanopagamento_.
+
+A unidade de millisatoshi não pode, é claro, ser liquidada na blockchain do Bitcoin com essa granularidade. Ao fechar o canal, os saldos são arredondados para o satoshi mais próximo. No entanto, ao longo da vida útil de um canal, milhões de nanopagamentos são possíveis em níveis de millisatoshi. A Lightning Network ultrapassa a barreira dos micropagamentos.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc15")))
+
+=== Semelhança entre o Bitcoin e a Lightning 
+
+((("Bitcoin–Lightning Network comparisons","commonalities", id="ix_03_how_ln_works-asciidoc16", range="startofrange")))Embora a Lightning Network se diferencie do Bitcoin em diversos aspectos, incluindo arquitetura e experiência do usuário, ela é construída a partir do Bitcoin e mantém muitas das características fundamentais do Bitcoin.
+
+==== Unidade Monetária
+
+((("Bitcoin–Lightning Network comparisons","monetary unit commonalities")))Tanto a rede do Bitcoin quanto a Lightning Network utilizam as mesmas unidades monetárias: bitcoin. Os pagamentos na Lightning usam exatamente o mesmo bitcoin das transações do Bitcoin. Como consequência, devido à unidade monetária ser a mesma, o limite monetário também é o mesmo: menos de 21 milhões de bitcoin. Dos 21 milhões de bitcoin totais da rede Bitcoin, alguns já estão alocados em endereços de multisig 2-de-2 como parte dos canais de pagamento na Lightning Network.
+
+==== Irreversibilidade e Finalidade dos Pagamentos
+
+((("Bitcoin–Lightning Network comparisons","payment irreversibility/finality")))Tanto as transações do Bitcoin quanto os pagamentos na Lightning são irreversíveis e imutáveis. Não há operação de "desfazer" ou "estorno" em nenhum dos sistemas. Como remetente em ambos os casos, é necessário agir de forma responsável. No entanto, como destinatário, você tem a garantia de finalidade em suas transações.
+
+==== Confiança e Risco de Contraparte
+
+((("Bitcoin–Lightning Network comparisons","trust and counterparty risk")))Assim como o Bitcoin, a Lightning Network requer que o usuário confie apenas na matemática, na criptografia e que o software não tenha bugs críticos. Nem o Bitcoin nem a Lightning exigem que o usuário confie em uma pessoa, empresa, instituição ou governo.
+Como a Lightning está construída sobre o Bitcoin e depende do Bitcoin como sua camada de base subjacente, é claro que o modelo de segurança da Lightning se baseia na segurança do Bitcoin. Isso significa que a Lightning oferece amplamente a mesma segurança do Bitcoin na maioria das circunstâncias, havendo apenas uma leve redução na segurança em algumas circunstâncias específicas.
+
+==== Operação Sem Permissões
+
+((("Bitcoin–Lightning Network comparisons","permissionless operation")))Tanto o Bitcoin quanto a Lightning podem ser utilizados por qualquer pessoa com acesso à internet e ao software apropriado, como um nó (node) e uma carteira (wallet).
+Nenhuma das redes exige que os usuários obtenham permissão, aprovação ou autorização de terceiros, empresas, instituições ou governos. Governos podem proibir o uso do Bitcoin ou da Lightning dentro de sua jurisdição, mas não podem impedir seu uso globalmente.
+
+==== Código Aberto e Sistema Aberto
+
+((("Bitcoin–Lightning Network comparisons","open source/open system")))Tanto o Bitcoin quanto a Lightning são sistemas de software de código aberto construídos por uma comunidade global descentralizada de voluntários, disponíveis sob licenças abertas. Ambos são baseados em protocolos abertos e interoperáveis, operando como sistemas e redes abertos. Globais, abertos e livres.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc16")))
+
+=== Conclusão
+
+Neste capítulo, examinamos como a Lightning Network realmente funciona e todos os componentes que a constituem. Analisamos cada etapa na construção, operação e fechamento de um canal. Observamos como os pagamentos são roteados e, finalmente, comparamos a Lightning com o Bitcoin e analisamos suas diferenças e semelhanças.(((range="endofrange", startref="ix_03_how_ln_works-asciidoc0")))
+
+Nos próximos capítulos, abordaremos todos esses tópicos novamente, mas com muito mais detalhes.

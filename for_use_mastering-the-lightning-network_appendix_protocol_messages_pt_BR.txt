@@ -1,0 +1,736 @@
+[appendix]
+[[wire_protocol_enumeration]]
+[[protocol_messages]]
+[[messages]]
+== Mensagens de Protocolo Wire
+
+((("wire protocol messages", id="ix_appendix_protocol_messages-asciidoc0", range="startofrange")))Este apêndice lista todos os tipos de mensagens atualmente definidos utilizados no protocolo Lightning P2P. Além disso, mostramos a estrutura de cada mensagem, agrupando as mensagens em grupos lógicos com base nos fluxos do protocolo.
+
+[OBSERVAÇÃO]
+====
+As mensagens do Protocolo Lightning são extensíveis e sua estrutura pode mudar durante atualizações em toda a rede. Para obter informações autoritativas, consulte a versão mais recente dos BOLTs encontrados em https://github.com/lightningnetwork/lightning-rfc[GitHub Lightning-RFC repository].
+====
+
+=== Message Types
+
+((("wire protocol messages","message types", id="ix_appendix_protocol_messages-asciidoc1", range="startofrange")))Os tipos de mensagens atualmente definidos estão listados na <<apdx_message_types>>.
+
+[[apdx_message_types]]
+.Tipos de mensagem
+[options="header"]
+|===
+| Tipo inteiro | Nome da mensagem | Categoria
+| 16  | `init`             |  Estabelecimento de Conexão
+| 17  | `error`             | Erro de Comunicação
+| 18  | `ping`             | Vitalidade da Conexão
+| 19  | `pong`             | Vitalidade da Conexão
+| 32  | `open_channel`             |          Financiamento de Canal
+| 33  | `accept_channel`             |          Financiamento de Canal
+| 34  | `funding_created`             |          Financiamento de Canal
+| 35  | `funding_signed`             |          Financiamento de Canal
+| 36  | `funding_locked`             |          Financiamento de Canal + Operação de Canal
+| 38  | `shutdown`             | Fechamento de Canal
+| 39  | `closing_signed`             |         Fechamento de Canal
+| 128 | `update_add_htlc`             |          Operação de Canal
+| 130 | `update_fulfill_hltc`             |          Operação de Canal
+| 131 | `update_fail_htlc`             |          Operação de Canal
+| 132 | `commit_sig`             |          Operação de Canal
+| 133 | `revoke_and_ack`             |          Operação de Canal
+| 134 | `update_fee`             |          Operação de Canal
+| 135 | `update_fail_malformed_htlc`             |          Operação de Canal
+| 136 | `channel_reestablish`             |         Operação de Canal
+| 256 | `channel_announcement`             |          Anúncio de Canal
+| 257 | `node_announcement`             |          Anúncio de Canal
+| 258 | `channel_update`             |          Anúncio de Canal
+| 259 | `announce_signatures`             |          Anúncio de Canal
+| 261 | `query_short_chan_ids`             |          Sincronização de Grafo de Canais
+| 262 | `reply_short_chan_ids_end`             |          Sincronização de Grafo de Canais
+| 263 | `query_channel_range`             |          Sincronização de Grafo de Canais
+| 264 | `reply_channel_range`             |          Sincronização de Grafo de Canais
+| 265 | `gossip_timestamp_range`             |          Sincronização de Grafo de Canais
+|===
+
+Na <<message_types>>, o campo `Category` permite a rápida categorização de uma
+mensagem com base em sua funcionalidade dentro do próprio protocolo. Em alto nível,
+colocamos uma mensagem em um dos oito buckets (não exaustivos), incluindo:
+
+Connection Establishment:: Enviada quando uma conexão peer-to-peer é estabelecida
+estabelecida. Também usado para negociar o conjunto de recursos suportados
+por uma nova conexão.
+
+Error Communication:: Usada por peers para comunicar um ao outro a ocorrência de
+erros em nível de protocolo.
+
+Connection Liveness:: Usada por peers para verificar que certa conexão
+de transporte ainda está ativa.
+
+Channel Funding:: Usada por peers para criar um novo canal de pagamento. Este
+também é conhecido como processo de financiamento de canal.
+
+Channel Operation:: O ato de atualizar um determinado canal off-chain. Isto
+inclui o envio e recebimento de pagamentos, bem como o encaminhamento de pagamentos
+dentro da rede.
+
+Channel Announcement:: O processo de anunciar um novo canal público
+para a rede mais ampla para que possa ser usada para propósitos de roteamento.
+
+Channel Graph Syncing:: O processo de fazer download e verificação do channel 
+  graph.
+
+
+Observe como as mensagens que pertencem à mesma categoria geralmente também compartilham um
+ _message type_ (tipo de mensagem) adjacente. Isso é feito com o propósito de agrupar
+mensagens semanticamente similares dentro da especificação em si.(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc1")))
+
+=== Message Structure
+
+((("wire protocol messages","message structure", id="ix_appendix_protocol_messages-asciidoc2", range="startofrange")))Agora detalhamos cada categoria de mensagem para definir
+com precisão a estrutura e a semântica todas as mensagens definidas no protocolo 
+LN (Lightning Network). 
+
+==== Mensagens de Estabelecimento de Conexão
+
+((("wire protocol messages","connection establishment messages")))Mensagens nesta categoria são as primeiríssimas mensagens enviadas entre pares assim que 
+eles estabelecem uma conexão de transporte. No momento em que escrevemos este capítulo
+existe somente uma única mensagem dentro desta categoria, a mensagem `init`.
+A mensagem `init` é enviada por ambos os lados da conexão assim que ela é 
+estabelecida pela primeira vez. Nenhuma outra mensagem deve ser enviada antes que a mensagem `init`
+tenha sido enviada por ambas as partes. 
+
+
+[[apdx_init_message]]
+======= A mensagem init
+
+((("wire protocol messages","init message")))A estrutura da mensagem `init` é definida como segue:
+
+ * Tipo: 16
+ * Campos:
+    ** `uint16`: `global_features_len`
+    ** `global_features_len*byte`: `global_features`
+    ** `uint16`: `features_len`
+    ** `features_len*byte`: `features`
+    ** `tlv_stream_tlvs`
+
+Estruturalmente, a mensagem `init` é composta por duas fatias de bytes de tamanho variável
+e cada uma armazena um conjunto de _feature bits_. ((("feature bits","defined")))As we see in <<feature_bits>>, feature bits são uma 
+primitiva usada dentro do protocolo para anunciar o conjunto de recursos
+do protocolo que um node entende (recursos opcionais) ou exige (recursos 
+obrigatórios).
+
+Observe que as implementações modernas de nodes usarão apenas o campo `features`, com
+itens que residem no vetor `global_features` para principalmente propósitos
+_históricos_ (compatibilidade retroativa ou backward compatibility).
+
+O que segue após a mensagem principal é uma série de registros de Tipo-Comprimento-Valor, ou Type-Length-Value (TLV) que podem ser usados para estender a mensagem de forma compatível com versões futuras e passadas, no futuro. Vamos explicar o que são os registros TLV e como 
+eles são utilizados mais tarde neste apêndice.
+
+A mensagem `init` é então examinada por um peer para determinar se
+a conexão é bem definida com base no conjunto de recursos opcionais e necessários
+suportados e anunciados por ambos os lados. 
+
+Um recurso opcional significa que um peer conhece um recurso, mas não 
+o considera fundamental para o funcionamento de uma nova conexão. Um exemplo disso
+seria a capacidade de entender a semântica de um campo 
+recém-adicionado a uma mensagem existente.
+
+Por outro lado, recursos obrigatórios indicam que se o outro peer não 
+conhecer o recurso, então a conexão não está bem definida. Um exemplo
+desse recurso seria um novo tipo de canal teórico dentro do protocolo:
+ se o seu peer não conhece esse recurso, você não deseja manter
+a conexão porque eles não podem abrir o seu novo tipo preferido de canal.
+
+==== Mensagens de Erro de Comunicação
+
+((("wire protocol messages","error communication messages")))Mensagens nesta categoria são usadas para enviar erros de nível de conexão entre dois
+peers. Existe outro tipo de erro no protocolo: um
+erro de encaminhamento de HTLC. Erros de nível de conexão podem sinalizar 
+coisas como incompatibilidade de bits de recurso ou a intenção de forçar o fechamento (unilateralmente 
+transmitir o último compromisso assinado).
+
+[[apdx_error_message]]
+===== A mensagem de erro
+
+((("wire protocol messages","error message")))A única mensagem nesta categoria é a mensagem `error`.
+
+ * Tipo: 17
+ * Campos:
+  ** `channel_id` : `chan_id`
+  ** `uint16` : `data_len`
+  ** `data_len*byte` : `data`
+
+Uma mensagem de  `error` pode ser enviada dentro do escopo de um canal específico
+definindo o campo `channel_id` para o `channel_id` do canal que está passando por esse 
+novo estado de erro. Alternativamente, se o erro se aplica à conexão em 
+geral, o campo `channel_id` deve ser definido como todos zeros.
+`channel_id` também é conhecido como um identificador de erro a nível de conexão. 
+
+Dependendo da natureza do erro, enviar uma mensagem `error` para um peer com quem você
+tem um canal pode indicar que o canal não pode continuar sem
+intervenção manual, então a única opção nesse ponto é forçar o fechamento do
+canal transmitindo o estado de compromisso (commitment state) mais recente do canal.
+
+==== Vitalidade da Conexão
+
+((("wire protocol messages","connection liveness messages")))As mensagens desta seção são usadas para sondar e verificar se uma conexão
+está ativa ou não. Como o protocolo LN abstrai em certa medida o transporte 
+subjacente usado para transmitir as mensagens, um conjunto de mensagens de nível de protocolo ((("wire protocol messages","ping message")))((("wire protocol messages","pong message"))) `ping` 
+e `pong`  são definidas.
+
+[[apdx_ping_message]]
+======= A mensagem ping
+
+A mensagem  `ping`  é usada para verificar se a outra parte em uma conexão está "ativa". Ela contém os seguintes campos:
+
+ * Tipo: 18
+ * Campos:
+  ** `uint16` : `num_pong_bytes`
+  ** `uint16` : `ping_body_len`
+  ** `ping_body_len*bytes` : `ping_body`
+
+Em seguida, seu companheiro, a mensagem `pong`.
+
+[[apdx_pong_message]]
+===== A mensagem pong
+
+A mensagem +pong+ é enviada em resposta à mensagem +ping+ e contém os seguintes campos:
+
+ * Tipo: 19
+ * Campos:
+  ** `uint16` : `pong_body_len`
+  ** `ping_body_len*bytes` : `pong_body`
+
+Uma mensagem `ping` pode ser enviada por qualquer uma das partes a qualquer momento.
+
+A mensagem `ping` inclui um campo `num_pong_bytes` que é usado para instruir
+o node receptor em relação ao tamanho do payload que ele envia em sua 
+mensagem de `pong`. A mensagem `ping`  também inclui um conjunto de bytes opacos chamado `ping_body`
+que pode ser ignorado com segurança. Ele serve apenas para permitir que o remetente preencha as mensagens `ping`
+que envia, o que pode ser útil na tentativa de impedir certas
+técnicas de desanonimização com base no tamanho dos pacotes na rede.
+
+Uma mensagem `pong` deve ser enviada em resposta a uma mensagem `ping` recebida. O
+receptor deve ler um conjunto de bytes aleatórios `num_pong_bytes` para enviar de volta como o
+campo `pong_body`. O uso inteligente desses campos/mensagens pode permitir que um node de roteamento
+preocupado com a privacidade tente impedir certas classes de tentativas de 
+desanonimização de rede, pois eles podem criar uma transcrição "falsa" que se
+assemelha a outras mensagens com base nos tamanhos de pacotes enviados. Lembre-se de que, por
+padrão, a Lightning Network usa um transporte _criptografado_, portanto, um monitor passivo de rede 
+não pode ler os bytes em texto simples e, portanto, só tem informações de temporização e tamanhos de pacotes para 
+se basear.
+
+==== Financiamento do Canal
+
+((("wire protocol messages","channel funding", id="ix_appendix_protocol_messages-asciidoc3", range="startofrange")))Conforme avançamos, entramos no território das mensagens principais que governam a
+funcionalidade e a semântica do Protocolo Lightning. Nesta seção,
+exploramos as mensagens enviadas durante o processo de criação de um novo canal. Apenas
+descreveremos os campos utilizados, pois deixamos uma análise detalhada do
+processo de financiamento no <<payment_channels>>.
+
+As mensagens que são enviadas durante o fluxo de financiamento do canal pertencem ao seguinte
+conjunto de cinco mensagens: `open_channel`, `accept_channel`, `funding_created`,
+`funding_signed` e `funding_locked`.
+
+O fluxo detalhado do protocolo usando essas mensagens é descrito em <<payment_channels>>.
+
+[[apdx_open_channel_message]]
+===== A mensagem open_channel
+
+A mensagem +open_channel+ inicia o processo de financiamento do canal e contém os seguintes campos:
+
+ * Tipo: 32
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `32*byte` : `temp_chan_id`
+  ** `uint64` : `funding_satoshis`
+  ** `uint64` : `push_msat`
+  ** `uint64` : `dust_limit_satoshis`
+  ** `uint64` : `max_htlc_value_in_flight_msat`
+  ** `uint64` : `channel_reserve_satoshis`
+  ** `uint64` : `htlc_minimum_msat`
+  ** `uint32` : `feerate_per_kw`
+  ** `uint16` : `to_self_delay`
+  ** `uint16` : `max_accepted_htlcs`
+  ** `pubkey` : `funding_pubkey`
+  ** `pubkey` : `revocation_basepoint`
+  ** `pubkey` : `payment_basepoint`
+  ** `pubkey` : `delayed_payment_basepoint`
+  ** `pubkey` : `htlc_basepoint`
+  ** `pubkey` : `first_per_commitment_point`
+  ** `byte` : `channel_flags`
+  ** `tlv_stream` : `tlvs`
+
+((("open_channel message")))((("wire protocol messages","open_channel message")))Esta é a primeira mensagem enviada quando um nó deseja executar um novo fluxo de financiamento
+com outro node. Essa mensagem contém todas as informações necessárias 
+para que ambos os peers construam tanto ambas as transações de financiamento (funding transaction) quanto ambas as 
+transação de compromisso (commitment transaction).
+
+No momento da escrita deste capítulo, um único registro TLV é definido dentro 
+do conjunto de registros TLV opcionais que podem ser anexados ao final de uma mensagem 
+definida:
+
+ * Tipo: 0
+ * Dados:  `upfront_shutdown_script`
+
+O `upfront_shutdown_script` é uma sequência de bytes de tamanho variável que deve ser um 
+script de chave pública válido, conforme aceito pelo algoritmo de consenso da rede 
+Bitcoin. Ao fornecer esse endereço, a parte que envia é capaz de
+criar efetivamente um "loop fechado" para seu canal, pois nenhum dos lados assinará 
+uma transação de encerramento cooperativo que pague para qualquer outro endereço. Na 
+prática, esse endereço costuma ser derivado de uma carteira de armazenamento a frio (cold storage).
+
+O campo `channel_flags` é um bitfield (campo de bits) do qual, no momento da escrita, apenas
+o _primeiro_ bit tem algum tipo de significado. Se esse bit estiver definido, esse canal será anunciado para a rede pública como um canal roteável. Caso contrário, o canal é considerado não anunciado, também
+conhecido como um canal privado.
+
+[[apdx_accept_channel_message]]
+===== A mensagem accept_channel
+
+((("accept_channel message")))((("wire protocol messages","accept_channel message")))A mensagem `accept_channel`  é a resposta à mensagem `open_channel` .
+
+[role="pagebreak-before"]
+ * Tipo: 33
+ * Campos:
+  ** `32*byte` : `temp_chan_id`
+  ** `uint64` : `dust_limit_satoshis`
+  ** `uint64` : `max_htlc_value_in_flight_msat`
+  ** `uint64` : `channel_reserve_satoshis`
+  ** `uint64` : `htlc_minimum_msat`
+  ** `uint32` : `minimum_depth`
+  ** `uint16` : `to_self_delay`
+  ** `uint16` : `max_accepted_htlcs`
+  ** `pubkey` : `funding_pubkey`
+  ** `pubkey` : `revocation_basepoint`
+  ** `pubkey` : `payment_basepoint`
+  ** `pubkey` : `delayed_payment_basepoint`
+  ** `pubkey` : `htlc_basepoint`
+  ** `pubkey` : `first_per_commitment_point`
+  ** `tlv_stream` : `tlvs`
+
+A mensagem `accept_channel` é a segunda mensagem enviada durante o processo de fluxo de 
+financiamento. Ela serve para reconhecer a intenção de abrir um canal com um novo node remoto
+(peer). A mensagem geralmente reflete o conjunto de parâmetros que o destinatário deseja 
+aplicar à sua versão da transação de compromisso. No <<payment_channels>>,
+quando entramos no processo de financiamento em detalhes, exploramos
+as implicações dos vários parâmetros que podem ser definidos ao abrir um novo
+canal.
+
+[[apdx_funding_created_message]]
+===== A mensagem funding_created
+
+((("funding_created message")))((("wire protocol messages","funding_created message")))Em resposta, o iniciador enviará a mensagem funding_created.
+
+ * Tipo: 34
+ * Campos:
+  ** `32*byte` : `temp_chan_id`
+  ** `32*byte` : `funding_txid`
+  ** `uint16` : `funding_output_index`
+  ** `sig` : `commit_sig`
+
+Uma vez que o iniciador de um canal recebe a mensagem accept_channel 
+do destinatário, ele tem todos os materiais necessários para construir 
+a transação de compromisso, bem como a transação de financiamento. Como os canais
+por padrão, possuem apenas um financiador (apenas um lado compromete fundos), somente o iniciador
+precisa para construir a transação de financiamento. Como resultado, para permitir que o
+destinatário assine uma versão da transação de compromisso para o iniciador, o
+iniciador só precisa enviar o "funding outpoint" do canal.
+
+[[apdx_funding_signed_message]]
+===== A mensagem funding_signed
+
+((("funding_signed message")))((("wire protocol messages","funding_signed message")))Para concluir, o destinatário envia a mensagem `funding_signed` . 
+
+ * Tipo: 34
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `sig` : `signature`
+
+Após receber a mensagem `funding_created`, o destinatário possui 
+agora uma assinatura válida da transação de compromisso pelo iniciador. Com
+essa assinatura, ele pode encerrar o canal a qualquer momento, assinando sua 
+metade da saída de financiamento multisig e transmitindo a transação. Isso é 
+chamado de encerramento forçado. Por outro lado, para dar ao iniciador a capacidade de encerrar o canal, o destinatário também assina a transação de compromisso do iniciador. 
+
+Assim que essa mensagem for recebida pelo iniciador, ele pode com segurança
+transmitir a transação de financiamento, pois agora pode encerrar o 
+acordo do canal unilateralmente.
+
+[[apdx_funding_locked_message]]
+======= A mensagem funding_locked
+
+((("funding_locked message")))((("wire protocol messages","funding_locked message")))Uma vez que a transação de financiamento tenha recebido um número suficiente de confirmações, a 
+mensagem `funding_locked` é enviada.
+
+ * Tipo: 36
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `pubkey` : `next_per_commitment_point`
+
+Somente após a transação de financiamento ter obtido um número de confirmações igual ou superior ao `minimum_depth` , 
+então a mensagem `funding_locked` deve ser enviada por ambos os lados. Somente após o 
+recebimento e envio dessa mensagem é que o canal pode começar a ser utilizado.(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc3")))
+
+==== Fechamento do Canal
+
+((("wire protocol messages","channel closing")))O fechamento do canal é um processo de várias etapas.((("wire protocol messages","shutdown message"))) Um node inicia enviando a mensagem `shutdown`. Os dois parceiros do canal então trocam uma série de mensagens `closing_signed` para negociar taxas mutuamente aceitáveis para a transação de fechamento.  ((("closing_signed message")))((("wire protocol messages","closing_signed message")))O financiador do canal envia a primeira mensagem `closing_signed` , e a outra parte pode aceitar enviando uma mensagem `closing_signed` com os mesmos valores de taxa. 
+
+[[apdx_shutdown_message]]
+===== A mensagem de desligamento
+
+A mensagem +shutdown+ inicia o processo de fechamento de um canal e contém os seguintes campos:
+
+ * Type: 38
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `u16` : `len`
+  ** `len*byte` : `scriptpubkey`
+
+[[apdx_closing_signed_message]]
+===== A mensagem closing_signed
+
+A mensagem +closing_signed+ é enviada por cada parceiro de canal até que eles concordem com as taxas. Ela contém os seguintes campos:
+
+ * Tipo: 39
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `u64` : `fee_satoshis`
+  ** `signature` : `signature`
+
+==== Operação do Canal
+
+((("wire protocol messages","channel operation", id="ix_appendix_protocol_messages-asciidoc4", range="startofrange")))Nesta seção, descrevemos brevemente o conjunto de mensagens usadas para permitir 
+que os nós operem um canal. Por operação, queremos dizer a capacidade de enviar, receber 
+e encaminhar pagamentos em um determinado canal.
+
+Para enviar, receber ou encaminhar um pagamento em um canal, um HTLC (Hashed Time-Locked Contract) deve
+ser adicionado primeiro às transações de compromisso (commitment transactions) que compõem uma ligação do canal (channel link).
+
+[role="pagebreak-before less_space"]
+[[apdx_update_add_htlc_message]]
+===== A mensagem update_add_htlc
+
+((("channel operation","update_add_htlc message")))((("update_add_htlc message")))((("wire protocol messages","update_add_htlc message")))A mensagem `update_add_htlc` permite que qualquer um dos lados adicione um novo HTLC à
+transação de compromisso oposta. 
+
+ * Tipo: 128
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `uint64` : `id`
+  ** `uint64` : `amount_msat`
+  ** `sha256` : `payment_hash`
+  ** `uint32` : `cltv_expiry`
+  ** `1366*byte` : `onion_routing_packet`
+
+O envio dessa mensagem permite que uma das partes inicie ou o envio de um novo pagamento
+ou encaminhe um pagamento existente que tenha chegado por meio de um canal de entrada. A
+mensagem especifica o valor (`amount_msat`) juntamente com o payment hash que 
+desbloqueia o próprio pagamento. O conjunto de instruções de encaminhamento do próximo salto 
+é criptografado em camadas (onion encryption) dentro do campo `onion_routing_packet`.. No <<onion_routing>>, em
+um encaminhamento de HTLC em vários saltos, abordamos em detalhes o protocolo de roteamento em camadas (onion routing) usado na 
+Lightning Network. 
+
+Observe que cada HTLC enviado usa um ID de incremento automático que é usado por qualquer 
+mensagem que modifica um HTLC (settle ou cancel) para referenciar o HTLC de 
+maneira única no escopo do canal.
+
+[[apdx_update_fulfill_hltc_message]]
+===== A mensagem update_fulfill_hltc
+
+((("channel operation","update_fulfill_hltc message")))((("update_fulfill_hltc message")))A mensagem `update_fulfill_hltc` permite o resgate (recebimento) de um HTLC ativo. 
+
+ * Tipo: 130
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `uint64` : `id`
+  ** `32*byte` : `payment_preimage`
+
+Essa mensagem é enviada pelo receptor do HTLC ao proponente para resgatar um
+HTLC ativo. A mensagem faz referência ao `id`  do HTLC em questão e também 
+fornece o preimage (que desbloqueia o HTLC).
+
+[[apdx_update_fail_htlc_message]]
+===== A mensagem update_fail_htlc
+
+((("channel operation","update_fail_htlc message")))((("update_fail_htlc message")))A mensagem `update_fail_htlc` é enviada para remover um HTLC de uma transação de compromisso.
+
+ * Tipo: 131
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `uint64` : `id`
+  ** `uint16` : `len`
+  ** `len*byte` : `reason`
+
+A mensagem `update_fail_htlc` é o oposto da mensagem `update_fulfill_hltc`, pois
+permite que o destinatário de um HTLC remova o próprio HTLC. Essa mensagem é 
+normalmente enviada quando um HTLC não pode ser roteado corretamente montante acima e precisa ser 
+devolvido ao remetente para desfazer a cadeia HTLC. Conforme exploramos em
+<<failure_messages>>, a mensagem contém um motivo de falha _criptografado_ (`reason`), que 
+pode permitir que o remetente ajuste sua rota de pagamento ou a encerre caso 
+a falha em si seja terminal.
+
+[[apdx_commitment_signed_message]]
+===== A mensagem commitment_signed
+
+((("channel operation","commitment_signed message")))((("commitment_signed message")))A mensagem `commitment_signed` é usada para carimbar a criação de uma nova transação de compromisso.
+
+ * Tipo: 132
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `sig` : `signature`
+  ** `uint16` : `num_htlcs`
+  ** `num_htlcs*sig` : `htlc_signature`
+
+Além de enviar uma assinatura para a próxima transação de compromisso, o 
+remetente desta mensagem também precisa enviar uma assinatura para cada HTLC 
+presente na transação de compromisso.
+
+[role="pagebreak-before less_space"]
+[[apdx_revoke_and_ack_message]]
+===== A mensagem revoke_and_ack 
+
+((("channel operation","revoke_and_ack message")))((("revoke_and_ack message")))A mensagem `revoke_and_ack` é enviada para revogar um compromisso datado.
+
+ * Tipo: 133
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `32*byte` : `per_commitment_secret`
+  ** `pubkey` : `next_per_commitment_point`
+
+Porque a Lightning Network utiliza uma transação de compromisso "replace-by-revoke" (substituir por revogação), após
+receber uma nova transação de compromisso por meio da mensagem `commit_sig` , uma parte 
+deve revogar seu compromisso anterior antes de poder receber outro.
+Ao revogar uma transação de compromisso, o revogador também fornece 
+o próximo ponto de compromisso que é necessário para permitir que a outra parte lhes envie 
+um novo estado de compromisso.
+
+[[apdx_update_fee_message]]
+===== A mensagem update_fee
+
+((("channel operation","update_fee message")))((("update_fee message")))A mensagem `update_fee` é enviada para atualizar a taxa nas transações de compromisso 
+atuais.
+
+ * Tipo: 134
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `uint32` : `feerate_per_kw`
+
+Esta mensagem só pode ser enviada pelo iniciador do canal; são eles que 
+pagarão pela taxa de compromisso do canal enquanto estiver aberto.
+
+[[apdx_update_fail_malformed_htlc_message]]
+===== A mensagem update_fail_malformed_htlc 
+
+((("channel operation","update_fail_malformed_htlc message")))((("update_fail_malformed_htlc message")))A mensagem `update_fail_malformed_htlc` é enviada para remover um HTLC corrompido.
+
+ * Tipo: 135
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `uint64` : `id`
+  ** `sha256` : `sha256_of_onion`
+  ** `uint16` : `failure_code`
+
+Essa mensagem é semelhante à mensagem `update_fail_htlc`, mas raramente é usada 
+na prática. Como mencionado anteriormente, cada HTLC contém um pacote de roteamento criptografado por cebola (onion encrypted routing) 
+que também cobre a integridade de partes do próprio HTLC. Se uma 
+parte receber um pacote de cebola que tenha sido corrompido de alguma forma no caminho, 
+ela não conseguirá descriptografar o pacote. Como resultado, ela também não pode encaminhar 
+corretamente o HTLC; portanto, enviará esta mensagem para indicar que o HTLC 
+foi corrompido em algum lugar ao longo do caminho de volta para o remetente.(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc4")))
+
+==== Anúncio do Canal
+
+((("channel_announcement message", id="ix_appendix_protocol_messages-asciidoc5", range="startofrange")))((("wire protocol messages","channel announcement", id="ix_appendix_protocol_messages-asciidoc6", range="startofrange")))As mensagens nesta categoria são usadas para anunciar componentes da estrutura de dados 
+autenticada do grafo de canais (channel graph) para a rede mais ampla. O grafo de canais possui
+uma série de propriedades exclusivas devido à condição de que todos os dados adicionados ao 
+grafo de canais também devem estar ancorados na blockchain do Bitcoin. Como 
+resultado, para adicionar uma nova entrada ao gráfico de canal, um agente deve ser uma
+taxa de transação on-chain. Isso serve como um impedimento de spam natural para a 
+Rede Relâmpago. 
+
+
+[[apdx_channel_announcement_message]]
+======= A mensagem channel_announcement
+
+A mensagem `channel_announcement` é usada para anunciar um novo canal para rede
+mais ampla.
+
+ * Tipo: 256
+ * Campos:
+  ** `sig` : `node_signature_1`
+  ** `sig` : `node_signature_2`
+  ** `sig` : `bitcoin_signature_1`
+  ** `sig` : `bitcoin_signature_2`
+  ** `uint16` : `len`
+  ** `len*byte` : `features`
+  ** `chain_hash` : `chain_hash`
+  ** `short_channel_id` : `short_channel_id`
+  ** `pubkey` : `node_id_1`
+  ** `pubkey` : `node_id_2`
+  ** `pubkey` : `bitcoin_key_1`
+  ** `pubkey` : `bitcoin_key_2`
+
+A sequência de assinaturas e chaves públicas na mensagem serve para criar uma
+_prova_ de que o canal realmente existe dentro da base da blockchain do Bitcoin. Conforme
+detalhamos em <<scid>>, cada canal é identificado de forma única por um localizador 
+que codifica sua _localização_ dentro da blockchain. Esse localizador é chamado de
+`short_channel_id` e pode ser representado por um número inteiro de 64 bits.
+
+[[apdx_node_announcement_message]]
+===== A mensagem node_announcement
+
+((("channel_announcement message","node_announcement message")))((("node_announcement message")))A mensagem  `node_announcement`  permite que um nó anuncie/atualize seu vértice dentro 
+do grafo de canais maior. 
+
+ * Tipo: 257
+ * Campos:
+  ** `sig` : `signature`
+  ** `uint64` : `flen`
+  ** `flen*byte` : `features`
+  ** `uint32` : `timestamp`
+  ** `pubkey` : `node_id`
+  ** `3*byte` : `rgb_color`
+  ** `32*byte` : `alias`
+  ** `uint16` : `addrlen`
+  ** `addrlen*byte` : `addresses`
+
+Note que se um nó não tiver nenhum canal anunciado dentro do grafo 
+de canais, então essa mensagem é ignorada para garantir que adicionar um item 
+ao grafo de canais tenha um custo na cadeia de blocos (on-chain). Nesse caso, o custo na cadeia de blocos será 
+o custo de criar o canal ao qual esse nó está conectado. 
+
+Além de anunciar suas capacidades, essa mensagem também permite que um nó 
+anuncie/atualize o conjunto de endereços de rede—`addresses`— onde ele pode ser alcançado.
+
+[[apdx_channel_update_message]]
+======= A mensagem channel_update
+
+((("channel_announcement message","channel_update message")))((("channel_update message")))A mensagem channel_update é enviada para atualizar as propriedades e políticas
+de uma borda de canal ativa dentro do grafo de canais.
+
+ * Tipo: 258
+ * Campos:
+  ** `signature` : `signature`
+  ** `chain_hash` : `chain_hash`
+  ** `short_channel_id` : `short_channel_id`
+  ** `uint32` : `timestamp`
+  ** `byte` : `message_flags`
+  ** `byte` : `channel_flags`
+  ** `uint16` : `cltv_expiry_delta`
+  ** `uint64` : `htlc_minimum_msat`
+  ** `uint32` : `fee_base_msat`
+  ** `uint32` : `fee_proportional_millionths`
+  ** `uint16` : `htlc_maximum_msat`
+
+Além de poder habilitar/desabilitar um canal, essa mensagem permite que 
+um nó atualize suas taxas de roteamento, bem como outros campos que determinam o tipo de 
+pagamento que é permitido fluir através desse canal.
+
+[[apdx_announce_signatures_message]]
+===== A mensagem announce_signatures
+
+((("announce_signatures message")))((("channel_announcement message","announce_signatures message")))A mensagem `announce_signatures`  é trocada pelos pares de canal para 
+montar o conjunto de assinaturas necessárias para produzir uma mensagem 
+`channel_announcement`.
+
+ * Tipo: 259
+ * Campos:
+  ** `channel_id` : `channel_id`
+  ** `short_channel_id` : `short_channel_id`
+  ** `sig` : `node_signature`
+  ** `sig` : `bitcoin_signature`
+
+Após o envio da mensagem `funding_locked`, se ambos os lados desejarem 
+divulgar seu canal para a rede, cada um enviará a
+mensagem `announce_signatures` , que permite que ambos os lados coloquem as quatro 
+assinaturas necessárias para gerar uma mensagem `announce_signatures` .(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc6")))(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc5")))
+
+==== Sincronização de gráfico de canal
+
+Os nós criam uma perspectiva local do gráfico do canal usando cinco mensagens: +query_short_chan_ids+, +reply_short_chan_ids_end+, +query_channel_range+, +reply_channel_range+ e +gossip_timestamp_range+.
+
+[[apdx_query_short_chan_ids_message]]
+======= A mensagem query_short_chan_ids
+
+((("channel graph syncing messages", id="ix_appendix_protocol_messages-asciidoc7", range="startofrange")))((("wire protocol messages","channel graph syncing", id="ix_appendix_protocol_messages-asciidoc8", range="startofrange")))A ((("channel graph syncing messages","query_short_chan_ids message")))((("query_short_chan_ids message")))mensagem `query_short_chan_ids`  permite que um nó obtenha informações sobre um canal
+relacionadas a uma série de IDs curtos de canal.
+
+ * Tipo: 261
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `u16` : `len`
+  ** `len*byte` : `encoded_short_ids`
+  ** `query_short_channel_ids_tlvs` : `tlvs`
+
+Como aprendemos no <<gossip>>, esses IDs de canal podem ser uma série de canais.
+que eram novos para o emissor ou estavam desatualizados, o que permite que o emissor 
+obtenha o conjunto mais recente de informações para um conjunto de canais.
+
+[[apdx_reply_short_chan_ids_end_message]]
+======= A mensagem reply_short_chan_ids_end
+
+((("channel graph syncing messages","reply_short_chan_ids_end message")))((("reply_short_chan_ids_end message")))A mensagem `reply_short_chan_ids_end` é enviada após um nó terminar de responder 
+a uma mensagem `query_short_chan_ids`  anterior. 
+
+ * Tipo: 262
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `byte` : `full_information`
+
+Essa mensagem indica à parte receptora que, se eles desejam enviar outra 
+mensagem de consulta, agora podem fazê-lo.
+
+[[apdx_query_channel_range_message]]
+===== A mensagem query_channel_range
+
+((("channel graph syncing messages","query_channel_range message")))((("query_channel_range message")))A mensagem  `query_channel_range` permite que um nó faça uma consulta para obter conjunto de canais 
+abertos dentro de um intervalo de blocos.
+
+ * Tipo: 263
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `u32` : `first_blocknum`
+  ** `u32` : `number_of_blocks`
+  ** `query_channel_range_tlvs` : `tlvs`
+
+
+Como os canais são representados usando um ID de canal curto que codifica a localização 
+de um canal na cadeia (on-chain), um nó na rede pode usar a altura de um bloco 
+como uma espécie de _cursor_ (indicador) para percorrer a cadeia a fim de descobrir um conjunto de canais 
+recém-abertos.
+
+[[apdx_reply_channel_range_message]]
+===== A mensagem reply_channel_range
+
+((("channel graph syncing messages","reply_channel_range message")))((("reply_channel_range message")))A mensagem `reply_channel_range`  é a resposta à mensagem `query_channel_range`  e
+inclui o conjunto de IDs curtos de canal para os canais conhecidos dentro desse intervalo. 
+
+ * Tipo: 264
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `u32` : `first_blocknum`
+  ** `u32` : `number_of_blocks`
+  ** `byte` : `sync_complete`
+  ** `u16` : `len`
+  ** `len*byte` : `encoded_short_ids`
+  ** `reply_channel_range_tlvs` : `tlvs`
+
+Como resposta à `query_channel_range`, essa mensagem envia de volta o conjunto de 
+canais que foram abertos dentro desse intervalo. Esse processo pode ser repetido com 
+o solicitante avançando seu _cursor_ mais adiante na cadeia para 
+continuar sincronizando o grafo de canais.
+
+[[apdx_gossip_timestamp_range_message]]
+======= A mensagem gossip_timestamp_range
+
+((("channel graph syncing messages","gossip_timestamp_range message")))((("gossip_timestamp_range message")))A mensagem `gossip_timestamp_range`  permite que um nó comece a receber novas 
+mensagens de gossip (fofoca) na rede.
+
+ * Tipo: 265
+ * Campos:
+  ** `chain_hash` : `chain_hash`
+  ** `u32` : `first_timestamp`
+  ** `u32` : `timestamp_range`
+
+Uma vez que um nó tenha sincronizado o grafo de canais, ele pode enviar essa mensagem se 
+desejar receber atualizações em tempo real sobre as alterações no grafo de canais. 
+Ele também pode definir os campos `first_timestamp`  e `timestamp_range`  se desejar 
+receber um backlog de atualizações que possam ter sido perdidas enquanto estava(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc8")))(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc7"))) desligado(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc2"))).(((range="endofrange", startref="ix_appendix_protocol_messages-asciidoc0")))

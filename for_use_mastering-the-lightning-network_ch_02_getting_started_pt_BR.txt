@@ -1,0 +1,456 @@
+[[getting-started]]
+== Começando
+
+
+((("Lightning Network (generally)","example", id="ix_02_getting_started-asciidoc0", range="startofrange")))Neste capítulo, começaremos onde a maioria das pessoas começa ao se deparar com a Lightning Network pela primeira vez&#x2014;escolhendo o software para participar da economia da LN. Vamos examinar as escolhas de dois usuários que representam um caso de uso comum para a Lightning Network e aprender por exemplo. Alice, uma cliente de uma cafeteria, usará uma carteira Lightning em seu dispositivo móvel para comprar café na Bob's Cafe. Bob, um comerciante, usará um nó e uma carteira Lightning para executar um sistema de ponto de venda em sua cafeteria, permitindo que ele aceite pagamentos pela Lightning Network.
+
+=== A Primeira Carteira Relâmpago de Alice
+
+((("Lightning Network (generally)","Lightning wallet")))((("Lightning wallet")))Alice é uma usuária de Bitcoin há muito tempo. Nós a conhecemos no Capítulo 1 de _Mastering Bitcoin_,footnote:[Andreas M. Antonopoulos, _Mastering Bitcoin_, 2nd Edition, https://github.com/bitcoinbook/bitcoinbook/blob/develop/ch01.asciidoc[Chapter 1] (O'Reilly)] quando ela comprou uma xícara de café Bob's Cafe usando uma transação em Bitcoin. Se você ainda não está familiarizado com o funcionamento das transações em Bitcoin ou precisa relembrar, por favor, leia o livro _Mastering Bitcoin_ ou o resumo em <<bitcoin_fundamentals_review>>.
+
+Alice descobriu recentemente que a cafeteria de Bob agora está aceitando pagamentos pela LN—Lightning Network! Alice está ansiosa para aprender e experimentar a Lightning Network; ela quer ser uma das primeiras clientes do Bob a usar a LN. Para fazer isso, primeiro, Alice precisa escolher uma carteira Lightning que atenda às suas necessidades.
+
+Alice não deseja confiar a custódia de seus bitcoin a terceiros. Ela aprendeu o suficiente sobre criptomoedas para saber como usar uma carteira. Além disso, ela quer uma carteira móvel (mobile wallet) para poder fazer pequenos pagamentos enquanto está em movimento, então ela escolhe a carteira _Eclair_, uma popular carteira móvel Lightning não custodial. Vamos aprender mais sobre como e por que ela fez essas escolhas.
+
+=== Nós da Lightning
+
+((("Lightning node operation")))A Lightning Network é acessada por meio de aplicativos de software que podem se comunicar por meio do protocolo LN. Um _nó da Lightning Network_ (nó LN ou simplesmente nó) é um aplicativo de software que possui três características importantes. Primeiro, os nós da Lightning são carteiras, o que significa que eles enviam e recebem pagamentos na Lightning Network, assim como na rede Bitcoin. Segundo, os nós devem se comunicar em uma base peer-to-peer (ponto a ponto) com outros nós da Lightning, criando a rede. Por fim, os nós da Lightning também precisam ter acesso à blockchain do Bitcoin (ou de outras blockchains para outras criptomoedas) para garantir os fundos utilizados nos pagamentos.
+
+Os usuários têm o mais alto grau de controle ao executar seu próprio nó Bitcoin e nó Lightning. No entanto, ((("simplified payment verification (SPV)")))((("SPV (simplified payment verification)")))os nós da Lightning também podem usar um cliente Bitcoin leve, comumente referido como verificação simplificada de pagamento (Simplified Payment Verification—SPV), para interagir com a blockchain do Bitcoin.
+
+[[ln_explorer]]
+=== Lightning Explorers
+
+((("Lightning explorers")))Os exploradores da LN são ferramentas úteis para mostrar as estatísticas de nós, canais e capacidade da rede.
+
+Segue uma lista inesgotável:
+
+* https://1ml.com[1ML Lightning explorer] 
+* https://explorer.acinq.co[ACINQ's Lightning explorer], com visualizações elaboradas
+* https://amboss.space[Amboss Space Lightning explorer], com métricas da comunidade e visualizações pass:[<span class="keep-together">intuitivas</span>]
+* https://ln.bigsun.xyz[Fiatjaf's Lightning explorer] com muitos diagramas
+*  https://hashxp.org/lightning/node[hashXP Lightning explorer]
+
+[DICA]
+====
+Observe que, ao usar exploradores da Lightning, assim como com outros exploradores de blocos, a privacidade pode ser uma preocupação.
+Se os usuários não forem cuidadosos, o site pode rastrear seus endereços IP e coletar registros de comportamento (por exemplo, os nós nos quais os usuários estão interessados).
+
+Além disso, é importante observar que, como não há um consenso global sobre o gráfico atual da Lightning ou o estado atual de qualquer política de canal existente, os usuários nunca devem confiar nos exploradores da Lightning para obter as informações mais atualizadas.
+Além disso, à medida que os usuários abrem, fecham e atualizam canais, o gráfico será alterado e os exploradores individuais da Lightning podem não estar atualizados.
+Utilize os exploradores da Lightning para visualizar a rede ou obter informações, mas não como uma fonte autoritativa do que está acontecendo na Lightning Network.
+Para ter uma visão autoritativa da Lightning Network, execute seu próprio nó Lightning que irá construir um gráfico de canais e coletar várias estatísticas, as quais você pode visualizar por meio de uma interface baseada na web.
+====
+
+=== Carteiras Relâmpago
+
+((("Lightning wallet","basics", id="ix_02_getting_started-asciidoc1", range="startofrange")))O termo _carteira Lightning_ é um tanto ambíguo, pois pode descrever uma variedade ampla de componentes combinados com uma interface de usuário. Os componentes mais comuns do software de carteira Lightning incluem:
+
+* Um repositório de chaves que armazena segredos, como chaves privadas
+* Um nó LN (Lightning node) que se comunica na rede peer-to-peer, como descrito anteriormente.
+* Um nó Bitcoin que armazena os dados da blockchain e se comunica com outros nós Bitcoin
+* Um banco de dados "mapa" de nós e canais que são anunciados na Lightning Network
+* Um gerenciador de canais que pode abrir e fechar canais da LN
+* Um sistema de roteamento que pode encontrar um caminho de canais conectados desde a origem do pagamento até o destino do pagamento
+
+Uma carteira Lightning pode conter todas essas funções, atuando como uma carteira "completa", sem depender de serviços de terceiros. Ou um ou mais desses componentes podem depender (parcial ou totalmente) de serviços de terceiros que intermediam essas funções.
+
+Uma distinção _chave_ (trocadilho intencional) é se a função de armazenamento de chaves é interna ou terceirizada. Nas blockchains, o controle das chaves determina a custódia dos fundos, conforme registrado pela frase "se as chaves são suas, as moedas são suas; se as chaves não são suas, as moedas não são suas". ((("custodial wallet")))Qualquer carteira que terceiriza a gestão das chaves é chamada de carteira _custodial_, pois uma terceira parte agindo como custodiante tem controle sobre os fundos do usuário, e não o próprio usuário. ((("noncustodial wallet")))Uma carteira _não custodial_ ou ((("self-custody wallet")))_autocustodial_, por comparação, é aquela em que o armazenamento de chaves faz parte da própria carteira, e as chaves são controladas diretamente pelo usuário. O termo carteira não custodial apenas implica que o armazenamento de chaves é local e está sob o controle do usuário. No entanto, um ou mais dos outros componentes da carteira podem ou não ser terceirizados e depender de terceiros confiáveis.
+
+As blockchains, especialmente as blockchains abertas como o Bitcoin, buscam minimizar ou eliminar a confiança em terceiros e empoderar os usuários. ((("trustless systems","blockchains as")))Isso é frequentemente chamado de modelo "sem confiança", embora "confiança minimizada" seja um termo mais adequado. Em tais sistemas, o usuário confia nas regras do software, não em terceiros. Portanto, a questão do controle das chaves é um aspecto fundamental a ser considerado ao escolher uma carteira Lightning.
+
+Todos os outros componentes de uma carteira Lightning trazem considerações semelhantes de confiança. Se todos os componentes estiverem sob o controle do usuário, então a quantidade de confiança em terceiros é minimizada, proporcionando máximo poder ao usuário. No entanto, isso envolve uma compensação (troca) direta, pois com esse poder vem a correspondente responsabilidade de gerenciar um software complexo.
+
+Cada usuário deve considerar suas próprias habilidades técnicas antes de decidir que tipo de carteira Lightning usar. Aqueles com habilidades técnicas avançadas devem utilizar uma carteira Lightning que coloque todos os componentes sob o controle direto do usuário. Já aqueles com habilidades técnicas mais limitadas, mas com o desejo de controlar seus fundos, devem escolher uma carteira Lightning não custodial.
+Frequentemente, a confiança nesses casos está relacionada à privacidade.
+Se os usuários decidem terceirizar alguma funcionalidade para uma terceira parte, geralmente eles abrem mão de um pouco de privacidade, pois essa terceira parte poderá obter algumas informações sobre eles.
+
+Por fim, aqueles que buscam simplicidade e conveniência, mesmo às custas de controle e segurança, podem escolher uma carteira Lightning custodial. Essa é a opção menos desafiadora tecnicamente, mas ela _enfraquece o modelo de confiança das criptomoedas_ e, portanto, deve ser considerada apenas como um passo inicial em direção a um maior controle e autossuficiência.
+
+Existem muitas maneiras pelas quais as carteiras podem ser caracterizadas ou categorizadas.
+As perguntas mais importantes a serem feitas sobre uma carteira específica são:
+
+. Esta carteira Lightning tem um nó Lightning completo ou usa um nó Lightning de terceiros?
+. Esta carteira Lightning tem um nó Bitcoin completo ou usa um nó Bitcoin de terceiros?
+. Esta carteira Lightning armazena suas próprias chaves sob controle do usuário (autocustódia) ou as chaves são mantidas por um terceiro?
+
+[DICA]
+====
+Se uma carteira Lightning utiliza um nó Lightning de terceiros, é esse nó Lightning de terceiros que decide como se comunicar com o Bitcoin. Portanto, o uso de um nó Lightning de terceiros implica que você também está usando um nó Bitcoin de terceiros. Somente quando a carteira Lightning utiliza seu próprio nó Lightning é que existe a escolha entre um nó Bitcoin completo ou um nó Bitcoin de terceiros.
+====
+
+No nível mais alto de abstração, as questões 1 e 3 são as mais elementares.
+A partir dessas duas perguntas, podemos derivar quatro categorias possíveis.
+Podemos colocar essas quatro categorias em um quadrante, como visto na <<lnwallet-categories>>.
+Mas lembre-se de que esta é apenas uma maneira de categorizar as carteiras Lightning.
+
+[[lnwallet-categories]]
+.Lightning wallets quadrant
+[options="header"]
+|===
+|                        | *Nó Lightning Completo*      | *Nó Lightning de Terceiros*
+| *Autocustódia*         | Q1: Alta habilidade técnica, menor confiança em terceiros, mais sem permissão | Q2: Habilidades técnicas abaixo da média, confiança abaixo da média em terceiros, requer algumas permissões
+| *Custodial*            | Q3: Habilidades técnicas acima da média, confiança acima da média em terceiros, requer algumas permissões| Q4: Habilidades técnicas baixas, alta confiança em terceiros, menos sem permissão
+|===
+
+O quadrante 3 (Q3), onde um nó Lightning completo é usado, mas as chaves são mantidas por um custodiante (terceiro), atualmente não é comum.
+As futuras carteiras desse quadrante podem permitir que um usuário se preocupe com os aspectos operacionais de seu nó, mas depois delegue o acesso às chaves a uma terceira parte que utiliza principalmente armazenamento a frio (cold storage).
+
+As carteiras Lightning podem ser instaladas em uma variedade de dispositivos, incluindo laptops, servidores e dispositivos móveis. Para executar um nó completo da Lightning, você precisará usar um servidor ou computador desktop, pois dispositivos móveis e laptops geralmente não possuem capacidade, processamento, vida útil da bateria e conectividade suficientes.
+
+A categoria nós Lightning de terceiros pode novamente ser subdividida:
+
+Leve::
+Isso significa que a carteira não opera um nó da Lightning e, portanto, precisa obter informações sobre a Lightning Network pela internet a partir do nó do Lightning de outra pessoa.
+None:: 
+Isso significa que não apenas o nó do Lightning é operado por uma terceira parte, mas a maior parte da carteira é operada por uma terceira parte na nuvem. Esta é uma carteira custodial em que outra pessoa controla a custódia dos fundos.
+
+Essas subcategorias são usadas na <<lnwallet-examples>>.
+
+[role="pagebreak-before"]
+Outros termos que precisam de explicação na <<lnwallet-examples>> na coluna "Nó Bitcoin" são:
+
+Neutrino::
+Esta carteira não opera um nó Bitcoin. Em vez disso, ela acessa um nó Bitcoin operado por outra pessoa (uma terceira parte) por meio do Protocolo Neutrino.
+Electrum::
+Esta carteira não opera um nó Bitcoin. Em vez disso, ela acessa um nó Bitcoin operado por outra pessoa (uma terceira parte) por meio do Protocolo Electrum.
+Bitcoin Core::
+Esta é uma implementação de um nó Bitcoin.
+btcd::
+Esta é outra implementação de um nó Bitcoin.
+
+Na <<lnwallet-examples>>, vemos alguns exemplos de aplicativos de carteira e nó do Lightning atualmente populares para diferentes tipos de dispositivos. A lista é classificada primeiro por tipo de dispositivo e depois em ordem alfabética.
+
+[[lnwallet-examples]]
+.Exemplos de carteiras Lightning populares
+[options="header"]
+|===
+| Aplicativo    | Dispositivo  | Nó Lightning | Nó Bitcoin          | Armazenamento de chaves
+| Blue Wallet    | Mobile  | Nenhum        | Nenhum                  | Custodial
+| Breez Wallet   | Mobile  | Nó Completo   | Neutrino              | Autocustódia
+| Eclair Mobile  | Mobile  | Leve | Electrum              | Autocustódia
+| lntxbot        | Mobile  | Nenhum        | Nenhum                  | Custodial
+| Muun | Mobile  | Leve | Neutrino              | Autocustódia
+| Phoenix Wallet | Mobile  | Leve | Electrum              | Autocustódia
+| Zeus           | Mobile  | Nó Completo   | Bitcoin Core/btcd     | Autocustódia
+| Electrum       | Desktop | Nó Completo   | Bitcoin Core/Electrum | Autocustódia
+| Zap Desktop    | Desktop | Nó Completo   | Neutrino              | Autocustódia
+| c-lightning    | Servidor  | Nó Completo   | Bitcoin Core          | Autocustódia
+| Eclair Server  | Servidor  | Nó Completo   | Bitcoin Core/Electrum | Autocustódia
+| lnd            | Servidor  | Nó Completo   | Bitcoin Core/btcd     | Autocustódia
+|===
+
+[[testnet-bitcoin]]
+==== Testnet Bitcoin
+
+((("Lightning wallet","testnet bitcoin and")))((("testnet bitcoin (tBTC)")))O sistema Bitcoin oferece uma cadeia alternativa para fins de teste chamada _testnet_, em contraste com a cadeia Bitcoin "normal" conhecida como _mainnet_. Na testnet, a moeda utilizada é o _testnet bitcoin_ (_tBTC_), que é uma cópia sem valor do bitcoin usada exclusivamente para testes. Todas as funções do Bitcoin são replicadas exatamente, mas o dinheiro não tem valor, então você literalmente não tem nada a perder!
+
+Algumas carteiras Lightning também podem operar na testnet, permitindo que você faça pagamentos Lightning com testnet bitcoin, sem correr o risco de fundos reais. Essa é uma ótima maneira de experimentar o Lightning com segurança. O Eclair Mobile, que Alice usa neste capítulo, é um exemplo de uma carteira Lightning que suporta operação na testnet.
+
+Você pode obter algum tBTC para brincar em um _testnet bitcoin faucet_, que distribui tBTC gratuitamente sob demanda. Aqui estão alguns faucets da testnet:
+
+++++
+<ul class="simplelist">
+<li><a href="https://coinfaucet.eu/en/btc-testnet/"><em>https://coinfaucet.eu/en/btc-testnet</em></a></li>
+<li><a href="https://testnet-faucet.mempool.co/"><em>https://testnet-faucet.mempool.co</em></a></li>
+<li><a href="https://bitcoinfaucet.uo1.net/"><em>https://bitcoinfaucet.uo1.net</em></a></li>
+<li><a href="https://testnet.help/en/btcfaucet/testnet"><em>https://testnet.help/en/btcfaucet/testnet</em></a></li>
+</ul>
+++++
+
+Todos os exemplos deste livro podem ser replicados exatamente na testnet com tBTC, para que você possa acompanhar sem correr o risco de perder dinheiro real.(((range="endofrange", startref="ix_02_getting_started-asciidoc1")))
+
+=== Equilibrando Complexidade e Controle
+
+((("Lightning wallet","balancing complexity and control")))As carteiras Lightning precisam encontrar um equilíbrio cuidadoso entre complexidade e controle do usuário. Aquelas que oferecem ao usuário o maior controle sobre seus fundos, o mais alto grau de privacidade e a maior independência de serviços de terceiros são necessariamente mais complexas e difíceis de operar. Conforme a tecnologia avança, algumas dessas compensações se tornarão menos acentuadas e os usuários poderão ter mais controle sem aumentar a complexidade. No entanto, por enquanto, diferentes empresas e projetos estão explorando diferentes posições nesse espectro de controle e complexidade, na esperança de encontrar o "ponto ideal" para os usuários que estão segmentando.
+
+Ao selecionar uma carteira, tenha em mente que, mesmo que você não perceba essas compensações, elas ainda existem. Por exemplo, muitas carteiras tentarão remover o ônus da gestão de canais de seus usuários. Para fazer isso, elas introduzem _nós centrais_ (hub nodes) aos quais todas as suas carteiras se conectam automaticamente. Embora essa compensação simplifique a interface do usuário e a experiência do usuário, ela introduz um único ponto de falha (Single Point of Failure—SPoF) à medida que esses nós centrais se tornam indispensáveis para o funcionamento da carteira. Além disso, depender de um "hub" desse tipo pode reduzir a privacidade do usuário, pois o hub sabe o remetente e, potencialmente (se estiver construindo a rota de pagamento em nome do usuário), também o destinatário de cada pagamento feito pela carteira do usuário.
+
+Na próxima seção, vamos voltar para nossa primeira usuária e acompanhar a configuração de sua primeira carteira Lightning. Ela escolheu uma carteira mais sofisticada do que as carteiras custodiais mais fáceis. Isso nos permite mostrar parte da complexidade subjacente e introduzir o funcionamento interno de uma carteira avançada. Você pode descobrir que sua primeira carteira ideal prioriza facilidade de uso, aceitando algumas das compensações de controle e privacidade. Ou talvez você seja um usuário avançado e queira executar seus próprios nós Lightning e Bitcoin como parte de sua solução de carteira.
+
+=== Baixando e Instalando uma Carteira Lightning
+
+((("Lightning wallet","downloading/installing")))Ao procurar por uma nova carteira de criptomoedas, é fundamental ter muito cuidado ao selecionar uma fonte segura para o software. 
+
+Infelizmente, muitos aplicativos de carteira falsos podem roubar seu dinheiro, e alguns deles até mesmo encontram seu caminho em lojas de aplicativos confiáveis e supostamente verificadas, como a App Store da Apple e a Google Play Store. Sempre exerça extrema cautela, quer você esteja instalando sua primeira ou décima carteira. Um aplicativo malicioso não só pode roubar qualquer dinheiro que você confiar a ele, mas também pode ser capaz de roubar chaves e senhas de outros aplicativos ao comprometer o sistema operacional do seu dispositivo móvel.
+
+((("Eclair wallet, downloading/installing")))Alice usa um dispositivo Android e usará a Google Play Store para baixar e instalar a carteira Eclair. Ao pesquisar na Google Play, ela encontra uma entrada para "Eclair Mobile", conforme mostrado na <<eclair-playstore>>.
+
+[[eclair-playstore]]
+.Eclair Mobile na Google Play Store
+image::images/mtln_0201.png["Eclair wallet in the Google Play Store"]
+
+
+[DICA]
+====
+É possível experimentar e testar todo o software relacionado ao Bitcoin sem nenhum risco (exceto pelo seu próprio tempo) usando testnet bitcoins. Você também pode baixar a carteira Eclair para testnet e experimentar o Lightning (na testnet) acessando a Google Play Store.
+====
+
+Alice nota alguns elementos diferentes nesta página que a ajudam a verificar que esta é, muito provavelmente, a carteira "Eclair Mobile" correta que ela está procurando. Primeiramente, a organização ACINQfootnote:[ACINQ: Developers of the Eclair Mobile Lightning wallet.] está listada como desenvolvedora desta carteira móvel, o que Alice sabe em sua pesquisa que é o desenvolvedor correto. Em segundo lugar, a carteira foi instalada "10.000+" vezes e possui mais de 320 avaliações positivas. É improvável que este seja um aplicativo malicioso que tenha se infiltrado na Google Play Store. Em terceiro lugar, ela acessa o https://acinq.co[ACINQ website]. Ela verifica que a página da web é segura ao verificar se o endereço começa com "https" ou se há um cadeado na barra de endereço em alguns navegadores. No site, ela vai para a seção de Downloads ou procura pelo link para a Google Play Store. Ela encontra o link e clica nele. Ela compara e verifica que esse link a leva para o exato aplicativo na Google Play Store. Satisfeita com essas descobertas, Alice instala o aplicativo Eclair em seu dispositivo móvel.
+
+[AVISO]
+====
+Sempre tenha muito cuidado ao instalar software em qualquer dispositivo. Existem muitas carteiras de criptomoedas falsas que não apenas roubarão seu dinheiro, mas também podem comprometer todos os outros aplicativos em seu dispositivo.
+====
+
+=== Criando uma Nova Carteira
+
+((("Lightning wallet","creating a new wallet", id="ix_02_getting_started-asciidoc2", range="startofrange")))Quando Alice abre o aplicativo Eclair Mobile pela primeira vez, ela se depara com a opção de "Criar uma Nova Carteira" ou "Importar uma Carteira Existente". Alice criará uma nova carteira, mas vamos primeiro discutir por que essas opções são apresentadas aqui e o que significa importar uma carteira existente.
+
+==== Responsabilidade com a Custódia das Chaves
+
+((("keys","Lightning wallet and")))((("Lightning wallet","responsibility with key custody")))Conforme mencionado no início desta seção, o Eclair é uma carteira _não custodial_, o que significa que Alice tem a custódia exclusiva das chaves usadas para controlar seus bitcoin. Isso também significa que Alice é responsável por proteger e fazer backup dessas chaves. Se Alice perder as chaves, ninguém poderá ajudá-la a recuperar os bitcoin, e eles serão perdidos para sempre.
+
+[AVISO]
+====
+Com a carteira Eclair Mobile, Alice tem a custódia e o controle das chaves e, portanto, a responsabilidade total de manter as chaves seguras e fazer backup delas. Se ela perder as chaves, perderá os bitcoin, e ninguém poderá ajudá-la a recuperar essa perda!
+====
+
+==== Palavras Mnemônicas
+
+((("Lightning wallet","mnemonic phrase")))((("mnemonic phrase")))((("seed (mnemonic) phrase")))Similarmente à maioria das carteiras de Bitcoin, o Eclair Mobile fornece uma _frase mnemônica_ (também às vezes chamada de "seed" ou "seed phrase") para que Alice faça o backup. A frase mnemônica consiste em 24 palavras em inglês, selecionadas aleatoriamente pelo software e usadas como base para as chaves que são geradas pela carteira. Alice pode usar a frase mnemônica para restaurar todas as transações e fundos na carteira Eclair Mobile no caso de perda do dispositivo móvel, um bug de software ou corrupção de memória.
+
+[DICA]
+====
+O termo correto para essas palavras de backup é "frase mnemônica". Evitamos o uso do termo "seed" (semente) para se referir à frase mnemônica, porque, embora seu uso seja comum, ele é incorreto.
+====
+
+Quando Alice escolhe criar uma nova carteira, ela verá uma tela com sua frase mnemônica, que se parece com a captura de tela na <<eclair-mnemonic>>.
+
+[[eclair-mnemonic]]
+.Frase mnemônica de nova carteira
+image::images/mtln_0202.png["New Wallet Mnemonic Phrase"]
+
+Na <<eclair-mnemonic>>, nós intencionalmente ocultamos parte da frase mnemônica para evitar que os leitores deste livro a reutilizem.
+
+[[mnemonic-storage]]
+==== Armazenando a Mnemônica com Segurança
+
+((("Lightning wallet","mnemonic phrase storage")))Alice precisa ter cuidado ao armazenar a frase mnemônica de uma maneira que evite roubo, mas também evite perdas acidentais. A maneira recomendada de equilibrar adequadamente esses riscos é escrever duas cópias da frase mnemônica em papel, com cada uma das palavras numeradas&#x2014;a ordem importa.
+
+Após Alice ter registrado a frase mnemônica e tocar em "OK, ENTENDI" na tela, ela será apresentada a um questionário para garantir que ela tenha registrado corretamente a frase mnemônica. O questionário solicitará três ou quatro palavras aleatórias. Alice não estava esperando um questionário, mas, como ela registrou corretamente a frase mnemônica, ela passa pelo questionário sem dificuldades.
+
+Após Alice ter registrado a frase mnemônica e passado pelo questionário, ela deve armazenar cada cópia em um local seguro separado, como uma gaveta trancada da escrivaninha ou um cofre à prova de fogo.
+
+[AVISO]
+====
+Nunca tente criar um esquema de segurança "faça você mesmo" que se desvie de qualquer forma das recomendações das melhores práticas em segurança <<mnemonic-storage>>. Não divida sua frase mnemônica ao meio, faça capturas de tela, armazene-a em unidades USB ou em serviços de armazenamento em nuvem, criptografe-a ou tente qualquer outro método não convencional. Ao fazer isso, você desequilibra a balança de tal forma que corre o risco de perda permanente. Muitas pessoas perderam fundos não por roubo, mas porque tentaram soluções não convencionais sem ter a expertise necessária para equilibrar os riscos envolvidos. A recomendação das melhores práticas é cuidadosamente considerada por especialistas e adequada para a grande maioria dos usuários.
+====
+
+Após inicializar sua carteira Eclair Mobile, Alice verá um breve tutorial que destaca os vários elementos da interface do usuário. Não iremos reproduzir o tutorial aqui, mas exploraremos todos esses elementos à medida que acompanharmos a tentativa de Alice de comprar uma xícara de café!(((range="endofrange", startref="ix_02_getting_started-asciidoc2")))
+
+=== Carregando Bitcoin na Carteira
+
+((("bitcoin (currency)","loading onto Lightning wallet", id="ix_02_getting_started-asciidoc3", range="startofrange")))((("Lightning wallet","loading bitcoin onto", id="ix_02_getting_started-asciidoc4", range="startofrange")))Alice agora possui uma carteira Lightning. No entanto, ela está vazia! Agora ela enfrenta um dos aspectos mais desafiadores deste experimento: ela precisa encontrar uma maneira de adquirir alguns bitcoins e carregá-los em sua carteira Eclair.
+
+[DICA]
+====
+Se Alice já possui bitcoin em outra carteira, ela pode optar por enviar esses bitcoin para sua carteira Eclair em vez de adquirir novos bitcoin para carregar em sua nova carteira.
+====
+
+[[acquiring-bitcoin]]
+==== Adquirindo Bitcoin
+
+((("bitcoin (currency)","acquiring for Lightning wallet")))((("Lightning wallet","acquiring bitcoin for")))Existem várias maneiras pelas quais Alice pode adquirir bitcoin:
+
+* Ela pode trocar parte de sua moeda nacional (por exemplo, USD) em uma corretora de criptomoedas.
+* Ela pode comprar alguns de um amigo, ou um conhecido de um encontro Bitcoin, em troca de dinheiro.
+* Ela pode encontrar um _Caixa Eletrônico de Bitcoin_ em sua área, que funciona como uma máquina de venda automática, vendendo bitcoin por dinheiro.
+[role="pagebreak-before"]
+* Ela pode oferecer suas habilidades ou um produto que ela vende e aceitar pagamento em bitcoin.
+* Ela pode pedir a seu empregador ou clientes que a paguem em bitcoin.
+
+Todas essas métodos têm diferentes níveis de dificuldade e muitos envolvem o pagamento de taxas. Alguns também podem exigir que Alice forneça documentos de identificação para cumprir as regulamentações bancárias locais. No entanto, com todos esses métodos, Alice será capaz de receber bitcoin.
+
+==== Recebendo Bitcoin
+
+((("bitcoin (currency)","receiving for Lightning wallet", id="ix_02_getting_started-asciidoc5", range="startofrange")))((("Bitcoin ATM", id="ix_02_getting_started-asciidoc6", range="startofrange")))((("Lightning wallet","receiving bitcoin", id="ix_02_getting_started-asciidoc7", range="startofrange")))Vamos supor que Alice tenha encontrado um caixa eletrônico de Bitcoin local e decidiu comprar alguns bitcoins em troca de dinheiro em espécie. Um exemplo de um caixa eletrônico de Bitcoin, construído pela empresa Lamassu, é mostrado na <<bitcoin-atm>>. Esses caixas eletrônicos de Bitcoin aceitam moeda nacional (dinheiro em espécie) por meio de uma abertura para inserção do dinheiro e enviam bitcoin para um endereço Bitcoin escaneado a partir da carteira do usuário usando uma câmera embutida.
+
+[[bitcoin-atm]]
+.Um caixa eletrônico Bitcoin Lamassu
+image::images/mtln_0203.png["Lamassu Bitcoin ATM"]
+
+Para receber os bitcoin em sua carteira Eclair Lightning, Alice precisará fornecer um endereço Bitcoin da carteira Eclair Lightning ao caixa eletrônico. O caixa eletrônico poderá então enviar os bitcoin recém-adquiridos por Alice para esse endereço Bitcoin.
+
+Para visualizar um endereço Bitcoin na carteira Eclair, Alice precisa deslizar para a coluna esquerda intitulada SEU ENDEREÇO BITCOIN (see <<eclair-receive>>), onde ela verá um código de barras quadrado (chamado de _QR code_) e uma sequência de letras e números logo abaixo.
+
+O código QR contém a mesma sequência de letras e números exibida abaixo dele, em um formato fácil de escanear. Dessa forma, Alice não precisa digitar o endereço Bitcoin. Na captura de tela (<<eclair-receive>>), Nós intencionalmente ocultamos ambos para evitar que os leitores enviem bitcoin para este endereço inadvertidamente.
+
+[[eclair-receive]]
+.Endereço bitcoin de Alice, mostrado em Eclair
+image::images/mtln_0204.png["Eclair bitcoin address QR code"]
+
+[OBSERVAÇÃO]
+====
+Ambos endereços Bitcoin e códigos QR contêm informações de detecção de erros que impedem que erros de digitação ou escaneamento produzam um endereço Bitcoin "errado". Se houver um erro no endereço, qualquer carteira de Bitcoin detectará o erro e se recusará a aceitar o endereço Bitcoin como válido.
+====
+
+[role="pagebreak-before"]
+Alice pode levar seu dispositivo móvel ao caixa eletrônico e mostrá-lo para a câmera embutida, conforme mostrado na <<bitcoin-atm-receive>>. Após inserir dinheiro na abertura designada, Alice receberá bitcoin em sua carteira Eclair!
+
+[[bitcoin-atm-receive]]
+.Caixa eletrônico Bitcoin escaneia o QR code
+image::images/mtln_0205.png["Bitcoin ATM scans the QR code"]
+
+Alice verá a transação do caixa eletrônico na guia HISTÓRICO DE TRANSAÇÕES da carteira Eclair. Embora a Eclair detecte a transação de bitcoin em apenas alguns segundos, levará aproximadamente uma hora para que a transação de bitcoin seja "confirmada" na blockchain do Bitcoin. Como você pode ver na <<eclair-tx1>>, A carteira Eclair de Alice mostra "6+ conf" abaixo da transação, indicando que a transação recebeu o mínimo necessário de seis confirmações, e seus fundos estão prontos para uso.
+
+[DICA]
+====
+O número de confirmações em uma transação é o número de blocos minerados desde (e incluindo) o bloco que continha essa transação. Seis confirmações é uma prática recomendada, mas diferentes carteiras Lightning podem considerar um canal aberto após qualquer número de confirmações. Algumas carteiras até aumentam o número de confirmações esperadas com base no valor monetário do canal.
+====
+
+Embora neste exemplo Alice tenha utilizado um caixa eletrônico para adquirir seu primeiro bitcoin, os mesmos conceitos básicos se aplicariam mesmo se ela utilizasse um dos outros métodos mencionados em <<acquiring-bitcoin>>. Por exemplo, se Alice quisesse vender um produto ou fornecer um serviço profissional em troca de bitcoin, seus clientes poderiam escanear o endereço Bitcoin com suas carteiras e pagar a ela em bitcoin.
+
+[[eclair-tx1]]
+.Alice recebe bitcoin
+image::images/mtln_0206.png["Bitcoin transaction received"]
+
+Da mesma forma, se Alice emitisse uma fatura para um cliente por um serviço oferecido pela internet, ela poderia enviar um e-mail ou mensagem instantânea com o endereço Bitcoin ou o código QR para seu cliente, e ele poderiam colar ou escanear as informações em uma carteira de Bitcoin para fazer o pagamento a ela.
+
+Alice poderia até mesmo imprimir o código QR e fixá-lo em uma placa para exibição pública, a fim de receber gorjetas. Por exemplo, ela poderia fixar um código QR em seu violão e receber gorjetas enquanto se apresenta na rua!footnote:[Geralmente, não é recomendado reutilizar o mesmo endereço de Bitcoin para múltiplos pagamentos, pois todas as transações de Bitcoin são públicas.
+Uma pessoa curiosa que passa por perto pode escanear o código QR de Alice e ver quantas gorjetas ela já recebeu para esse endereço na blockchain do Bitcoin.
+Felizmente, a Lightning Network oferece soluções mais privadas para isso, discutidas posteriormente neste livro!]
+
+Por fim, se Alice comprou bitcoins em uma exchange de criptomoedas, ela pode (e deve) "retirar" os bitcoins colando seu endereço Bitcoin no site da exchange. A exchange enviará os bitcoins diretamente para o endereço de Alice(((range="endofrange", startref="ix_02_getting_started-asciidoc7")))(((range="endofrange", startref="ix_02_getting_started-asciidoc6")))(((range="endofrange", startref="ix_02_getting_started-asciidoc5"))).(((range="endofrange", startref="ix_02_getting_started-asciidoc4")))(((range="endofrange", startref="ix_02_getting_started-asciidoc3")))
+
+=== Do Bitcoin à Lightning Network
+
+((("Lightning wallet","bridging of Bitcoin and Lightning networks", id="ix_02_getting_started-asciidoc8", range="startofrange")))Os bitcoin de Alice agora estão sob controle de sua carteira Eclair e foram registrados na blockchain do Bitcoin. Neste ponto, os bitcoin de Alice estão _on-chain_, o que significa que a transação foi transmitida para toda a rede Bitcoin, verificada por todos os nós Bitcoin e _minerada_ (registrada) na blockchain do Bitcoin.
+
+Até agora, a carteira Eclair Mobile tem funcionado apenas como uma carteira de Bitcoin, e Alice não utilizou os recursos da Lightning Network do Eclair. Como acontece com muitas carteiras Lightning, o Eclair faz a ponte entre o Bitcoin e a Lightning Network ao atuar como uma carteira de Bitcoin e uma carteira Lightning ao mesmo tempo.
+
+Agora, Alice está pronta para começar a usar a Lightning Network, levando seus bitcoin para fora da cadeia principal (off-chain), a fim de aproveitar os pagamentos rápidos, baratos e privados que a Lightning Network oferece.
+
+==== Canais da Lightning Network
+
+((("Lightning Network channels","basics", id="ix_02_getting_started-asciidoc9", range="startofrange")))((("Lightning Network channels","opening a channel", id="ix_02_getting_started-asciidoc10", range="startofrange")))((("Lightning wallet","LN channels and", id="ix_02_getting_started-asciidoc11", range="startofrange")))Ao deslizar para a direita, Alice acessa a seção CANAIS LIGHTNING dA Eclair. Aqui ela pode gerenciar os canais que conectarão sua carteira à Lightning Network.
+
+Vamos revisar a definição de um canal da Lightning Network (LN) neste ponto, para tornar as coisas um pouco mais claras. Primeiramente, a palavra "canal" é uma metáfora para um _relacionamento financeiro_ entre a carteira Lightning de Alice e outra carteira Lightning. Chamamos de canal porque é um meio para a carteira de Alice e essa outra carteira trocarem muitos pagamentos entre si na Lightning Network (off-chain, fora da cadeia principal), sem a necessidade de registrar transações na blockchain do Bitcoin (on-chain, na cadeia principal).
+
+((("channel peer")))A carteira ou _nó_ para a qual Alice abre um canal é chamada de seu _channel peer_ (par de canal). Uma vez "aberto", um canal pode ser usado para enviar muitos pagamentos de ida e volta entre a carteira de Alice e seu par de canal.
+
+Além disso, o par de canal de Alice pode _encaminhar_ pagamentos por meio de outros canais mais adiante na Lightning Network. Dessa forma, Alice pode _rotear_ um pagamento para qualquer carteira (por exemplo, para a carteira Lightning de Bob), desde que a carteira de Alice possa encontrar um _caminho_ viável pulando de canal em canal, até chegar à carteira de Bob.
+
+[DICA]
+====
+Nem todos os pares de canal são _bons_ para encaminhar pagamentos. Pares de canal bem conectados terão a capacidade de rotear pagamentos por caminhos mais curtos até o destino, aumentando as chances de sucesso. Pares de canal com bastante fundos poderão rotear pagamentos de valor mais alto.
+====
+
+Em outras palavras, Alice precisa de um ou mais canais que a conectem a um ou mais outros nós na Lightning Network. Ela não precisa de um canal para conectar sua carteira diretamente à cafeteria do Bob para enviar um pagamento a ele, embora possa optar por abrir um canal direto, se desejar. Qualquer nó na Lightning Network pode ser usado como o primeiro canal de Alice. Quanto mais bem conectado um nó estiver, mais pessoas Alice poderá alcançar. Neste exemplo, uma vez que também queremos demonstrar o roteamento de pagamentos, Alice não abrirá um canal diretamente para a carteira de Bob. Em vez disso, ela abrirá um canal para um nó bem conectado e, posteriormente, usará esse nó para encaminhar seu pagamento, roteando-o por outros nós conforme necessário para chegar a Bob.
+
+Inicialmente, não há canais abertos, como podemos ver na <<eclair-channels>>, a guia LIGHTNING CHANNELS mostra uma lista vazia. Se você observar, no canto inferior direito, há um símbolo de adição (+), que é um botão para abrir um novo canal.
+
+[[eclair-channels]]
+.Guia CANAIS LIGHTNING
+image::images/mtln_0207.png["LIGHTNING CHANNELS tab"]
+
+[role="pagebreak-before"]
+Alice pressiona o símbolo de adição e são apresentadas quatro possíveis formas de abrir um canal:
+
+* Colar um URI de nó
+* Escanear um URI de nó
+* Nó aleatório
+* Nó ACINQ
+
+Uma "URI de nó" é um Identificador Universal de Recurso (URI) que identifica um nó específico na Lightning Network. Alice pode colar essa URI a partir da área de transferência ou escanear um código QR que contenha essa mesma informação. Um exemplo de uma URI de nó é exibido como um código QR na <<node-URI-QR>> e, em seguida, como uma sequência de texto.
+
+[[node-URI-QR]]
+.URI de nó como QR code
+image::images/mtln_0208.png["Lightning node URI QR code",width=120]
+
+[[node-URI-example]]
+.node URI
+----
+0237fefbe8626bf888de0cad8c73630e32746a22a2c4faa91c1d9877a3826e1174@1.ln.aantonop.com:9735
+----
+
+Embora Alice possa selecionar um nó específico da Lightning Network ou usar a opção "Nó aleatório" para que a carteira Eclair selecione um nó aleatório, ela selecionará a opção Nó ACINQ para se conectar a um dos nós Lightning bem conectados da ACINQ.
+
+Ao escolher o nó ACINQ, a privacidade de Alice será ligeiramente reduzida, pois dará à ACINQ a capacidade de ver todas as transações de Alice. Isso também criará um único ponto de falha, já que Alice terá apenas um canal e, se o nó ACINQ não estiver disponível, Alice não poderá fazer pagamentos. Para manter as coisas simples no início, aceitaremos esses compromissos. Nos capítulos subsequentes, aprenderemos gradualmente como obter mais independência e fazer menos compromissos (trade-offs)!
+
+Alice seleciona o nó ACINQ e está pronta para abrir seu primeiro canal na Lightning Network.(((range="endofrange", startref="ix_02_getting_started-asciidoc11")))(((range="endofrange", startref="ix_02_getting_started-asciidoc10")))(((range="endofrange", startref="ix_02_getting_started-asciidoc9")))
+
+==== Abrindo um Canal Lightning
+
+((("Lightning wallet","opening a Lightning channel", id="ix_02_getting_started-asciidoc12", range="startofrange")))Quando Alice seleciona um nó para abrir um novo canal, ela é solicitada a escolher quanto bitcoin ela deseja alocar para esse canal. Nos capítulos subsequentes, discutiremos as implicações dessas escolhas, mas, por enquanto, Alice alocará quase todos os seus fundos para o canal. Como ela terá que pagar taxas de transação para abrir o canal, ela selecionará um valor ligeiramente menor do que o saldo total.footnote:[A carteira Eclair não oferece uma opção para calcular automaticamente as taxas necessárias e alocar a quantidade máxima de fundos para um canal. Portanto, Alice precisará fazer esse cálculo ela mesma.]
+
+Alice aloca 0,018 BTC dos seus 0,020 BTC totais para o seu canal e aceita a taxa de transação padrão, como mostrado na <<eclair-open-channel>>.
+
+[[eclair-open-channel]]
+.Abrindo um canal Lightning
+image::images/mtln_0209.png["Opening a Lightning Channel"]
+
+Depois de clicar em ABRIR, sua carteira constrói a transação especial do Bitcoin que ((("funding transaction")))abre um canal da Lightning, conhecida como _transação de financiamento_ (funding transaction). A transação de financiamento na cadeia principal (on-chain) é enviada para a rede Bitcoin para confirmação.
+
+Alice agora precisa esperar novamente (see <<eclair-channel-waiting>>) para que a transação seja registrada na blockchain do Bitcoin. Assim como na transação inicial de Bitcoin que ela usou para adquirir seus bitcoin, ela terá que esperar por seis ou mais confirmações (aproximadamente uma hora).
+
+[[eclair-channel-waiting]]
+.Aguardando a transação de financiamento para abrir o canal
+image::images/mtln_0210.png["Waiting for the Funding Transaction to Open the Channel"]
+
+Após a confirmação da transação de financiamento, o canal de Alice para o nó ACINQ estará aberto, financiado e pronto, como mostrado na <<eclair-channel-open>>.
+
+[[eclair-channel-open]]
+.O canal está aberto
+image::images/mtln_0211.png["Channel is Open"]
+
+[DICA]
+====
+Você percebeu que o valor do canal parece ter mudado? Na verdade, ele não mudou: o canal contém 0,018 BTC, mas, no intervalo entre as capturas de tela, a taxa de câmbio do BTC mudou, por isso o valor em USD está diferente. Você pode escolher exibir os saldos em BTC ou USD, mas lembre-se de que os valores em USD são calculados em tempo real e podem mudar(((range="endofrange", startref="ix_02_getting_started-asciidoc12")))!(((range="endofrange", startref="ix_02_getting_started-asciidoc8")))
+====
+
+=== Comprando uma Xícara de Café Usando a Lightning Network
+
+((("Lightning Network (generally)","example: buying a cup of coffee", id="ix_02_getting_started-asciidoc13", range="startofrange")))((("Lightning wallet","example: buying a cup of coffee", id="ix_02_getting_started-asciidoc14", range="startofrange")))Agora, Alice tem tudo pronto para começar a usar a Lightning Network. Como você pode ver, foi necessário um pouco de trabalho e um pouco de tempo de espera pelas confirmações. No entanto, agora as ações subsequentes são rápidas e fáceis. A Lightning Network permite pagamentos sem a necessidade de esperar por confirmações, pois os fundos são liquidados em questão de segundos.
+
+Alice pega seu dispositivo móvel e corre para a Café do Bob em seu bairro. Ela está animada para experimentar sua nova carteira Lightning e usá-la para comprar algo!
+
+==== Café do Bob
+
+Bob possui um aplicativo simples de ponto de venda (Point-of-Sale—PoS) para uso de qualquer cliente que queira pagar com bitcoin por meio da Lightning Network. Conforme veremos no próximo capítulo, Bob utiliza a popular plataforma de código aberto chamada _BTCPay Server_, que contém todos os componentes necessários para uma solução de comércio eletrônico ou varejo, tais como:
+
+* Um nó Bitcoin usando o software Bitcoin Core
+* Um nó Lightning usando o software c-lightning
+* Um aplicativo PoS simples para um tablet
+
+O BTCPay Server torna simples a instalação de todo o software necessário, o upload de imagens e preços de produtos, e o lançamento rápido de uma loja.
+
+No balcão do Café do Bob, há um dispositivo tablet mostrando o que você vê na <<bob-cafe-posapp>>.
+
+[[bob-cafe-posapp]]
+.Aplicativo de ponto de venda do Bob
+image::images/mtln_0212.png["Bob's Point-of-Sale Application"]
+
+==== Uma Fatura Lightning
+
+((("Lightning invoices", id="ix_02_getting_started-asciidoc15", range="startofrange")))((("Lightning wallet","invoices", id="ix_02_getting_started-asciidoc16", range="startofrange")))Alice seleciona a opção Café Latte na tela e é apresentada com uma _fatura Lightning_ (também conhecida como "solicitação de pagamento"), como mostrado na <<bob-cafe-invoice>>.
+
+[[bob-cafe-invoice]]
+.Fatura Lightning para o latte de Alice
+image::images/mtln_0213.png["BTCPay Server Lightning invoice"]
+
+[role="pagebreak-before"]
+Para pagar a fatura, Alice abre sua carteira Eclair e seleciona o botão Enviar (que se parece com uma seta voltada para cima) na guia HISTÓRICO DE TRANSAÇÕES, como mostrado em <<alice-send-start>>.
+
+[[alice-send-start]]
+.Alice selecionando Enviar
+image::images/mtln_0214.png["Lightning transaction send",width=300]
+
+[DICA]
+====
+O termo "solicitação de pagamento" pode se referir a uma solicitação de pagamento Bitcoin ou a uma fatura Lightning, e os termos "fatura" e "solicitação de pagamento" são frequentemente usados indistintamente. O termo técnico correto é "fatura Lightning" (Lightning invoice), independentemente de como seja chamado na carteira.
+====
+
+Alice seleciona a opção "escanear uma solicitação de pagamento", escaneia o código QR exibido na tela do tablet (see <<bob-cafe-invoice>>), e é solicitada a confirmar seu pagamento, como mostrado na <<alice-send-detail>>.
+
+Alice pressiona PAGAR e, um segundo depois, o tablet de Bob mostra um pagamento bem-sucedido. Alice concluiu seu primeiro pagamento pela Lightning Network! Foi rápido, barato e fácil. Agora ela pode desfrutar de seu café com leite, que foi comprado usando bitcoin por meio de um sistema de pagamento rápido, barato e descentralizado. A partir de agora, Alice pode simplesmente selecionar um item na tela do tablet de Bob, escanear o código QR com seu celular, clicar em PAGAR e receber um café, tudo em questão de segundos e sem a necessidade de uma transação on-chain, na cadeia principal.
+
+[[alice-send-detail]]
+.A confirmação de envio de Alice
+image::images/mtln_0215.png["Lightning transaction send confirmation",width=300]
+
+Pagamentos pela Lightning Network também são melhores para Bob. Ele tem confiança de que será pago pelo café com leite de Alice sem precisar esperar por uma confirmação na cadeia principal. No futuro, sempre que Alice quiser tomar um café no Café do Bob, ela poderá escolher pagar com bitcoin na rede Bitcoin ou na Lightning Network. Qual você acha que ela escolherá(((range="endofrange", startref="ix_02_getting_started-asciidoc16")))(((range="endofrange", startref="ix_02_getting_started-asciidoc15")))?(((range="endofrange", startref="ix_02_getting_started-asciidoc14")))(((range="endofrange", startref="ix_02_getting_started-asciidoc13")))
+
+=== Conclusão
+
+Neste capítulo, acompanhamos Alice enquanto ela baixou e instalou sua primeira carteira Lightning, adquiriu e transferiu alguns bitcoin, abriu seu primeiro canal Lightning e comprou uma xícara de café ao fazer seu primeiro pagamento na Lightning Network.(((range="endofrange", startref="ix_02_getting_started-asciidoc0"))) In the following chapters, we will look "under the covers" at how each component in the Lightning Network works and how Alice's payment reached Bob's Cafe.

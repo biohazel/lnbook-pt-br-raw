@@ -1,0 +1,411 @@
+[[wire_protocol]]
+== Protocolo Wire: Estrutura e Extensibilidade
+
+((("wire protocol", id="ix_13_wire_protocol-asciidoc0", range="startofrange")))Neste capítulo, mergulhamos no protocolo wire da Rede Relâmpago
+e também cobrimos todas as várias alavancas de extensibilidade que foram incorporadas no
+protocolo. No final deste capítulo, um leitor ambicioso deve ser capaz de
+escrever seu próprio analisador (parser) de protocolo wire para a Rede Relâmpago. Além de
+ser capaz de escrever um analisador de protocolo wire personalizado, um leitor deste capítulo
+obterá uma compreensão profunda dos vários mecanismos de atualização
+que foram incorporados ao protocolo.
+
+=== Camada de Mensagens no Conjunto de Protocolos Lightning 
+
+((("Lightning Network Protocol","messaging layer")))((("wire protocol","messaging layer in the Lightning Protocol Suite")))A camada de mensagens, detalhada neste capítulo, consiste em "Estrutura e formato de mensagem", codificação "Type-Length-Value" e "Feature bits". Esses componentes são destacados por um esquema no conjunto de protocolos, conforme mostrado na <<LN_protocol_wire_message_highlight>>.
+
+[[LN_protocol_wire_message_highlight]]
+.Camada de mensagens no conjunto de protocolos Lightning
+image::images/mtln_1301.png["Messaging layer in the Lightning protocol suite"]
+
+=== Estruturando o Wire
+
+((("wire framing", id="ix_13_wire_protocol-asciidoc1", range="startofrange")))((("wire protocol","wire framing", id="ix_13_wire_protocol-asciidoc2", range="startofrange")))Começamos descrevendo a estrutura de alto nível da _estruturação_ do wire
+dentro do protocolo. Quando dizemos estruturação, queremos dizer a maneira como os bytes são
+empacotados no wire para _codificar_ uma mensagem de protocolo específica. Sem conhecimento
+do sistema de estruturação usado no protocolo, uma sequência de bytes no wire seria
+semelhante a uma série de bytes aleatórios porque nenhuma estrutura foi imposta. Aplicando
+estruturação adequada para decodificar esses bytes no wire, poderemos extrair
+estrutura e, finalmente, analisar essa estrutura em mensagens de protocolo em nossa
+linguagem de alto nível.
+
+É importante observar que a Lightning Network é um protocolo
+ _criptografado_de_ponta_a_ponta, e a estruturação do wire em si está encapsulada dentro de uma
+camada de transporte de mensagens também criptografada. Como vemos no <<encrypted_message_transport>>, a Rede
+Relãmpago utiliza uma variante personalizada do Protocolo Noise para lidar
+com a criptografia do transporte. Dentro deste capítulo, sempre que fornecermos um exemplo de estrutura da
+comunicação, assumimos que a camada de criptografia já foi removida (ao
+decodificar) ou que ainda não criptografamos o conjunto de bytes antes de enviá-los 
+pelo wire (codificação).
+
+==== Estruturação Wire de Alto Nível
+
+((("wire framing","high-level schema")))Com isso dito, estamos prontos para descrever o esquema de alto nível usado 
+para codificar mensagens no wire:
+
+* As mensagens no wire começam com um campo do tipo _2 bytes_, seguido por uma
+carga útil da mensagem (message payload).
+* A própria carga útil da mensagem pode ter até 65 KB de tamanho.
+* Todos os números inteiros são codificados em big-endian (ordem de rede).
+* Quaisquer bytes que seguem após uma mensagem definida podem ser ignorados com segurança.
+
+Sim, isso mesmo. Como o protocolo depende de uma camada de criptografia _encapsulante_ 
+no protocolo de transporte, não precisamos de um comprimento explícito para cada tipo de mensagem. Isso
+ocorre porque a criptografia do transporte funciona no nível da _mensagem_, portanto, 
+quando estamos prontos para decodificar a próxima mensagem, já sabemos o número
+total de bytes da própria mensagem. Usando 2 bytes para o tipo de mensagem
+ (codificado em big-endian), significa que o protocolo pode ter até 2^16 - 1 ou 
+65.535 mensagens distintas. Além disso, como sabemos que todas as mensagens devem ter menos de
+65 KB, isso simplifica nosso processo de análise, pois podemos usar um buffer de _tamanho fixo_ e 
+manter limites estritos na quantidade total de memória necessária para analisar uma 
+mensagem wire recebida.
+
+O último ponto permite um grau de compatibilidade _retroativa_ (backward) porque os novos nós podem fornecer informações nas mensagens de comunicação que os nós mais antigos
+ (que podem não entendê-las) podem ignorar com segurança. Conforme veremos posteriormente, essa 
+característica, combinada com um formato de extensibilidade de mensagem wire muito flexível, permite que o protocolo alcance compatibilidade _progressiva_ (forward) também.
+
+==== Codificação de Tipo
+
+((("wire framing","type encoding")))Com esse contexto de alto nível fornecido, agora começamos pela camada
+mais primitiva: a análise (parsing) dos tipos primitivos. Além de codificar números inteiros, o Protocolo 
+Lightning também permite a codificação de uma ampla variedade de tipos, incluindo fatias de bytes de comprimento variável, chaves públicas de curva elíptica, endereços Bitcoin e
+assinaturas. Quando descrevemos a _estrutura_ das mensagens wire posteriormente neste 
+capítulo, nos referimos ao tipo de alto nível (o tipo abstrato) em vez da
+ representação de nível inferior desse tipo. Nesta seção, removemos essa 
+camada de abstração para garantir que nosso futuro analisador (parser) de wire seja capaz de 
+codificar/decodificar corretamente qualquer um dos tipos de alto nível.
+
+Na <<message_types>>, mapeamos o nome de um determinado tipo de mensagem para a 
+rotina de alto nível usada para codificar/decodificar o tipo.
+
+[[message_types]]
+.Tipos de mensagens de alto nível
+[options="header"]
+|===
+| Tipo de alto nível | Estrutura | Comentário
+| `node_alias` | Uma sequência de bytes de comprimento fixo de 32 bytes      | Ao decodificar, rejeitar se o conteúdo não for uma string UTF-8 válida
+| `channel_id` | Uma sequência de bytes de comprimento fixo de 32 bytes que mapeia um ponto de saída para um valor de 32 bytes    | Dado um ponto de saída (outpoint), é possível convertê-lo para um `channel_id` ao pegar o TxID do ponto de saída e realizar uma operação XOR com o índice (interpretado como os 2 bytes inferiores).
+| `short_chan_id` | Um inteiro não assinado de 64 bits (`uint64`) | Composto pela altura do bloco (24 bits), índice da transação (24 bits) e índice de saída (16 bits), empacotados em 8 bytes
+| `milli_satoshi` | Um número inteiro não assinado de 64 bits (`uint64`) | Representa a milésima (1000th) parte de um satoshi
+| `satoshi` | Um número inteiro não assinado de 64 bits (`uint64`) | A unidade básica do bitcoin 
+| `pubkey`  | Uma chave pública secp256k1 codificada no formato _comprimido_, ocupando 33 bytes | Ocupa um comprimento fixo de 33 bytes no wire
+| `sig`     | Uma assinatura ECDSA da curva elíptica secp256k1 | Codificada como uma sequência de bytes de comprimento _fixo_ de 64 bytes, empacotada como `R \|\| S`
+| `uint8`   | Um inteiro de 8 bits  |
+| `uint16`  | Um inteiro de 16 bits  |
+| `uint64`  | Um inteiro de 64 bits  |
+| `[]byte`  | Uma sequência de bytes de comprimento variável | Prefixado com um inteiro de 16 bits que indica o comprimento dos bytes
+| `color_rgb` | Codificação de cores RGB | Codificado como uma série de inteiros de 8 bits
+| `net_addr` | A codificação de um endereço de rede | Codificado com um prefixo de 1 byte que indica o tipo de endereço, seguido pelo conteúdo do endereço
+|===
+
+Na próxima seção, descrevemos a estrutura de cada mensagem wire,
+incluindo o tipo de prefixo da mensagem junto com o conteúdo do corpo da
+mensagem.(((range="endofrange", startref="ix_13_wire_protocol-asciidoc2")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc1")))
+
+[[tlv_message_extensions]]
+=== Extensões de Mensagens Tipo-Comprimento-Valor (Type-Length-Value)
+
+((("Type-Length-Value (TLV) message extensions","message extensions in wire protocol")))((("wire protocol","TLV message extensions")))Anteriormente neste capítulo, mencionamos que as mensagens podem ter um tamanho de até 65 KB
+e que, se durante a análise (parsing) de uma mensagem, sobrarem bytes extra, então esses bytes
+devem ser ignorados. À primeira vista, esse requisito pode parecer 
+arbitrário; no entanto, essa exigência permite a evolução desacoplada e dessincronizada do próprio Protocolo
+Relâmpago. Discutiremos isso com mais detalhes no final do capítulo. Mas antes, vamos direcionar nossa atenção para exatamente para que esses "bytes extras" no 
+final de uma mensagem podem ser usados.
+
+==== O Formato de Mensagem Protocolo Buffers
+
+((("Protocol Buffers (Protobuf) message serialization format")))((("Type-Length-Value (TLV) message extensions","Protocol Buffers message format")))O formato de serialização de mensagens Protocol Buffers (Protobuf) começou como um 
+formato interno usado no Google e se tornou um dos formatos de serialização de mensagens
+mais populares utilizados globalmente pelos desenvolvedores. O formato Protobuf
+descreve como uma mensagem (geralmente uma estrutura de dados relacionada a uma API)
+é codificada no wire e decodificada na outra ponta. Existem vários "compiladores
+Protobuf" disponíveis em dezenas de linguagens, que atuam como uma ponte que permite que qualquer
+linguagem codifique um Protobuf que possa ser decodificado por um decodificador compatível
+em outra linguagem. Essa compatibilidade de estrutura de dados entre linguagens diferentes permite
+uma ampla gama de inovações, pois é possível transmitir estruturas e até mesmo
+estruturas de dados com tipos através de fronteiras de linguagem e abstração.
+
+Protobufs também são conhecidos por sua flexibilidade em 
+lidar com mudanças na estrutura das mensagens subjacentes. Contanto que o 
+esquema de numeração dos campos seja seguido, é possível que uma versão mais recente
+de Protobufs inclua informações dentro de um Protobuf que podem ser desconhecidas para qualquer
+leitor mais antigo. Quando o leitor antigo encontra o novo formato serializado, se
+houver tipos/campos que ele não entenda, ele simplesmente os _ignora_.
+Isso permite que clientes antigos e novos coexistam, pois todos os clientes podem 
+analisar (parse) uma parte do formato de mensagem mais recente.
+
+==== Compatibilidade Progressiva e Retroativa
+
+((("Protocol Buffers (Protobuf) message serialization format")))((("Type-Length-Value (TLV) message extensions","forward/backward compatibility")))Os Protobufs são extremamente populares entre desenvolvedores porque possuem suporte 
+integrado tanto para compatibilidade progressiva quanto retroativa. A maioria das pessoas desenvolvedoras está
+provavelmente familiarizada com o conceito de compatibilidade retroativa. Em termos simples,
+o princípio afirma que quaisquer alterações no formato de mensagem ou API devem ser
+feitas de uma maneira que não quebre o suporte para clientes mais antigos. Nos exemplos anteriores de extensibilidade do Protobuf, a compatibilidade retroativa é alcançada 
+garantindo que as novas adições ao formato Protobuf não afetem as partes conhecidas
+pelos leitores mais antigos. Já a compatibilidade progressiva, por outro lado, é tão importante
+para atualizações dessincronizadas, mas é menos conhecida. Para que uma alteração 
+seja compatível progressivamente, os clientes devem simplesmente ignorar qualquer informação
+que não entendam. O mecanismo de soft fork para atualizar o sistema de consenso
+do Bitcoin pode ser considerado tanto compatível progressiva quanto retroativamente: quaisquer
+ clientes que não são atualizados ainda podem usar o Bitcoin e, se encontrarem quaisquer
+transações que não entendam, simplesmente as ignoram, pois seus fundos 
+não estão usando esses novos recursos.
+
+[[tlv]]
+=== Formato Tipo-Comprimento-Valor (Type-Length-Value, TLV)
+
+((("Type-Length-Value (TLV) format", id="ix_13_wire_protocol-asciidoc3", range="startofrange")))((("Type-Length-Value (TLV) format","wire protocol and", id="ix_13_wire_protocol-asciidoc4", range="startofrange")))((("wire protocol","TLV format", id="ix_13_wire_protocol-asciidoc5", range="startofrange")))Para ser capaz de atualizar as mensagens de forma compatível progressiva e
+retroativamente, além dos bits de recurso (mais sobre isso posteriormente), a Lightning Network utiliza um formato de serialização de mensagens personalizado chamado Tipo-Comprimento-Valor (Type-Length-Value, ou TLV). O formato foi inspirado no amplamente utilizado formato
+Protobuf e incorpora muitos conceitos, simplificando significativamente a
+implementação e o software que interage com a análise de mensagens. Um
+leitor curioso pode perguntar: "por que não usar apenas Protobufs?" Em resposta, as pessoas
+desenvolvedoras da Lightning responderiam que conseguimos obter a melhor
+ extensibilidade dos Protobufs, ao mesmo tempo em que nos beneficiamos de uma implementação
+menor e, portanto, menor risco de ataques. Na versão 3.15.6, o compilador 
+Protobuf tem mais de 656.671 linhas de código. Em comparação, a implementação
+do formato de mensagem TLV do LND possui apenas 2,3 mil linhas de código
+(incluindo testes).
+
+Com o contexto necessário apresentado, agora estamos prontos para descrever o formato TLV
+em detalhes. Uma extensão de mensagem TLV é uma sequência de
+registros TLV pass:[<span class="keep-together">individuais</span>]. Um único registro TLV possui três componentes: o tipo do
+registro, o comprimento do registro e, por fim, o valor opaco do
+registro:
+
+`type`:: Um inteiro que representa o nome do registro sendo codificado
+`length`:: O comprimento do registro
+`value`:: O valor opaco do registro
+
+Tanto o `type` quanto o `length` são codificados usando um inteiro de tamanho variável inspirado no inteiro de tamanho variável (varint) usado no protocolo P2P do Bitcoin, chamado de `BigSize` para simplificar.
+
+==== Codificação de Inteiro BigSize
+
+((("BigSize integer encoding")))((("Type-Length-Value (TLV) format","BigSize integer encoding")))IEm sua forma mais completa, um inteiro
+`BigSize` pode representar valores de até 64 bits. Ao contrário do formato varint 
+do Bitcoin, o formato  `BigSize` em vez disso codifica os inteiros usando uma ordem de bytes 
+big-endian.
+
+O varint `BigSize` possui dois componentes: o discriminante e o corpo. No 
+contexto do inteiro `BigSize` , o discriminante comunica ao decodificador 
+o tamanho do inteiro de tamanho variável que o segue. Lembre-se de que o aspecto único dos
+inteiros de tamanho variável é que eles permitem que um analisador (parser) use menos bytes para codificar 
+inteiros menores do que maiores, economizando espaço. A codificação de um inteiro 
+`BigSize` segue uma das quatro opções a seguir:
+
+1. Se o valor for menor que  `0xfd` (253): Nesse caso, o discriminante não é realmente usado, e a codificação é simplesmente o próprio inteiro. Isso nos permite codificar números muito pequenos sem qualquer sobrecarga adicional.
+
+2. Se o valor for menor ou igual a `0xffff` (`65535`): O discriminante é codificado como `0xfd`, o que indica que o valor que segue é maior que `0xfd`, mas menor que `0xffff`. O número é então codificado como um inteiro de 16 bits. Incluindo o discriminante, podemos codificar um valor maior que 253, mas menor que 65.535 usando 3 bytes.
+
+3. Se o valor for menor que `0xffffffff` (`4294967295`): O discriminante é codificado como `0xfe`. O corpo é codificado usando um inteiro de 32 bits, incluindo o discriminante, e podemos codificar um valor menor que `4.294.967.295` usando 5 bytes.
+
+4. Caso contrário, apenas codificamos o valor como um inteiro de 64 bits em tamanho real (completo).
+
+
+==== Restrições de Codificação TLV
+
+((("Type-Length-Value (TLV) format","encoding constraints")))Dentro do contexto de uma mensagem TLV, os tipos de registro abaixo de `2^16` são considerados _reservados_ para uso futuro. Tipos além dessa
+faixa devem ser usados para extensões de mensagem "personalizadas" usadas por protocolos de aplicação de nível mais alto. 
+
+O `value` (valor)  de um registro depende do `type` (tipo). Em outras palavras, ele pode ter qualquer formato, pois os analisadores (parsers) tentarão interpretá-lo com base no contexto do próprio tipo.
+
+==== Codificação Canônica TLV
+
+Um problema com o formato Protobuf é que a codificação da mesma mensagem pode 
+gerar um conjunto completamente diferente de bytes quando codificada por duas versões 
+diferentes do compilador. Essas instâncias de codificação não canônica não são
+aceitáveis no contexto da Lightning, pois muitas mensagens contêm uma
+assinatura do resumo da mensagem. Se for possível que uma mensagem seja codificada
+de duas maneiras diferentes, seria possível quebrar inadvertidamente a autenticação
+de uma assinatura ao recodificar uma mensagem usando um conjunto ligeiramente diferente 
+de bytes no wire.
+
+Para garantir que todas as mensagens codificadas sejam canônicas, as seguintes 
+restrições são definidas durante a codificação:
+
+* Todos os registros dentro de uma sequência TLV devem ser codificados em ordem de tipo
+estritamente crescente.
+
+  * Todos os registros devem codificar pelo menos os campos `type` e `length`. Em outras palavras, a menor representação `BigSize` para um inteiro deve ser usada em todos os momentos.
+
+  * Cada `type` só pode aparecer uma vez em uma determinada sequência TLV.
+
+Além dessas restrições de codificação, uma série de
+requisitos de interpretação em um nível mais alto também é definida com base na _aridade_ (número de argumentos) de um determinado inteiro `type`. Aprofundaremos esses detalhes mais adiante no
+capítulo, quando descrevermos como o Protocolo Lightning é atualizado na prática e 
+na teoria.(((range="endofrange", startref="ix_13_wire_protocol-asciidoc5")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc4")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc3")))
+
+[[feature_bits]]
+=== Feature Bits e Extensibilidade do Protocolo
+
+((("feature bits", id="ix_13_wire_protocol-asciidoc6", range="startofrange")))((("wire protocol","feature bits/protocol extensibility", id="ix_13_wire_protocol-asciidoc7", range="startofrange")))Devido à natureza descentralizada da Rede Relâmpago, nenhuma entidade única pode impor uma
+mudança ou modificação de protocolo a todos os usuários do sistema. Essa 
+característica também é observada em outras redes descentralizadas, como o Bitcoin.
+No entanto, ao contrário do Bitcoin, _não_ é necessário uma amplo consenso para mudar um
+subconjunto da Lightning Network. A Rede Relâmpago é capaz de evoluir livremente sem uma
+forte exigência de coordenação, pois, ao contrário do Bitcoin, não é necessário um consenso global na Rede Relâmpago. Devido a esse fato e aos diversos
+mecanismos de atualização incorporados na Rede Relâmpago, apenas os
+participantes que desejam usar esses novos recursos da Rede Relâmpago precisam
+fazer a atualização, e então eles podem interagir entre si.
+
+Nesta seção, exploramos as várias maneiras pelas quais as pessoas desenvolvedoras e usuárias
+podem projetar e implantar novos recursos na Rede Relâmpago. Os
+criadores da Lightning Network original sabiam que havia muitas direções possíveis para a rede e o protocolo subjacente. Como resultado, eles se certificaram de implementar vários
+mecanismos de extensibilidade dentro do sistema, que podem ser usados para atualizá-lo parcial ou totalmente de forma desacoplada, dessincronizada e
+ descentralizada.
+
+==== Feature Bits como um Mecanismo de Descoberta de Atualização
+
+((("feature bits","upgrade discoverability mechanism")))Um leitor atento pode ter percebido as várias localizações em que os feature bits são 
+incluídos no Protocolo Lightning. Um _feature bit_ é um campo de bits que pode
+ser usado para anunciar o entendimento ou a adesão a uma possível atualização
+do protocolo de rede. Os feature bits são comumente atribuídos em pares, o que significa que cada 
+novo recurso ou atualização potencial sempre define dois bits dentro do campo de bits.
+Um dos bits sinaliza que o recurso anunciado é _opcional_, o que significa que o
+nó tem conhecimento sobre o recurso (feature) e pode usá-lo, mas não
+o considera necessário para a operação normal. O outro bit sinaliza que
+o recurso é _obrigatório_, o que significa que o nó não continuará 
+a operação se um potencial par não entender esse recurso.
+
+Usando esses dois bits (opcional e obrigatório), podemos construir uma matriz de compatibilidade
+simples que os nós/usuários podem consultar para determinar se um par é compatível com um recurso desejado, conforme mostrado na <<table1302>>.
+
+[[table1302]]
+.Matriz de compatibilidade de feature bit
+[options="header"]
+|===
+|Tipo de bit|Remoto opcional|Remoto obrigatório|Remoto desconhecido
+|Local opcional|✅|✅|✅
+|Local obrigatório|✅|✅|❌
+|Local desconhecido|✅|❌|❌
+|===
+
+A partir desta matriz de compatibilidade simplificada, podemos observar que, desde que
+a outra parte tenha conhecimento sobre o nosso feature bit, podemos interagir com ela usando o 
+protocolo. Se a outra parte nem sequer souber a qual bit estamos nos referindo
+_e_ eles exigirem a feature, então não somos compatíveis com ela. Na rede,
+os recursos opcionais são sinalizados usando um _número ímpar de bit_, enquanto
+os recursos obrigatórios são sinalizados usando um _número par de bit_. Como exemplo, se um par sinalizar que conhece uma feature que usa o bit +15+, então sabemos que
+esta é uma feature opcional e podemos interagir com ele ou responder às
+suas mensagens mesmo que não conheçamos a feature. Se 
+eles em vez disso sinalizarem a feature usando o bit +16+, então sabemos que esta é uma
+feature obrigatória e não podemos interagir com ele a menos que nosso nó 
+também entenda essa feature.
+
+As pessoas desenvolvedoras da Lightning criaram uma frase fácil de lembrar que 
+codifica essa matriz: "é aceitável ser ímpar" ("it's OK to be odd", em inglês). Essa regra simples permite uma
+variedade de interações no protocolo, pois uma simples operação de bitmask 
+entre dois vetores de feature bits permite que os pares determinem se determinadas
+interações são compatíveis ou não. Em outras palavras, os feature
+bits são usados como um mecanismo de descoberta de atualização: eles permitem facilmente que os
+ pares entendam se são compatíveis ou não com base nos conceitos
+de feature bits opcionais, obrigatórios e desconhecidos.
+
+Feature bits são encontrados nas mensagens `node_announcement`, `channel_announcement` e 
+`init` dentro do protocolo. Como resultado, essas três mensagens podem ser 
+usadas para sinalizar o conhecimento e/ou compreensão das atualizações do protocolo
+em andamento na rede. Os feature bits encontrados na mensagem `node_announcement`
+permitem que um par determine se suas _conexões_ são compatíveis ou
+não. Os feature bits dentro de mensagens `channel_announcement` permitem que um peer
+determine se um determinado tipo de pagamento ou HTLC pode transitar através de um dado peer ou
+não. Os feature bits dentro da mensagem `init` permitem que peers entendam se
+eles podem manter a conexão, e também que features são negociadas durante a 
+vida útil de uma determinada conexão.
+
+==== TLV para Compatibilidade Progressiva ou Retroativa
+
+((("feature bits","TLV for forward/backward compatibility")))((("Type-Length-Value (TLV) format","forward/backward compatibility and")))((("wire protocol","TLV for forward/backward compatibility")))Como aprendemos anteriormente neste capítulo, os registros TLV podem ser 
+usados para estender as mensagens de maneira compatível tanto para frente (progressiva) quanto para trás (retroativa).
+Com o tempo, esses registros têm sido usados para estender mensagens existentes sem 
+quebrar o protocolo, aproveitando a área "indefinida" (undefined) dentro de uma mensagem além
+do conjunto de bytes conhecidos.
+
+Como exemplo, o protocolo original da Lightning Network não possuía o conceito de
+"maior valor de HTLC" que poderia transitar por um canal de acordo com uma política
+de roteamento. Posteriormente, o campo  `max_htlc`  foi adicionado à mensagem `channel_update`
+para introduzir gradualmente esse conceito ao longo do tempo. Pares que recebem uma
+`channel_update`  que define esse campo, mas não têm conhecimento da atualização,
+não são afetados pela mudança, mas têm seus HTLCs rejeitados se estiverem
+além do limite. Por outro lado, pares mais recentes são capazes de analisar (parse), verificar
+e utilizar o novo campo.
+
+Aqueles familiarizados com o conceito de soft forks no Bitcoin podem notar algumas 
+semelhanças entre os dois mecanismos. Ao contrário dos soft forks de consenso
+no Bitcoin, as atualizações na Lightning Network não requerem um consenso esmagador 
+para serem adotadas. Em vez disso, no mínimo, apenas dois pares dentro da
+rede precisam entender uma nova atualização para começar a usá-la. Comumente, esses dois pares podem ser o destinatário e o remetente de um
+pagamento, ou podem ser os parceiros de canal de um novo canal de pagamento.
+
+==== Uma Taxonomia de Mecanismos de Atualização
+
+((("Lightning Network (generally)","taxonomy of upgrade mechanisms", id="ix_13_wire_protocol-asciidoc8", range="startofrange")))((("upgrades","taxonomy of upgrade mechanisms", id="ix_13_wire_protocol-asciidoc9", range="startofrange")))((("wire protocol","taxonomy of upgrade mechanisms", id="ix_13_wire_protocol-asciidoc10", range="startofrange")))Em vez de existir um único mecanismo de atualização amplamente utilizado na
+rede (como soft forks no Bitcoin), existem vários mecanismos de atualização possíveis dentro da Lightning Network. Nesta
+seção, enumeramos esses mecanismos de atualização e 
+fornecemos um exemplo real de seu uso no passado.
+
+======= Atualizações internas da rede
+
+((("upgrades","internal network")))Começamos com o tipo de atualização que requer a maior coordenação em nível de
+protocolo: as atualizações internas da rede. Uma atualização interna da rede é
+caracterizada por aquela que requer que _todos os nós_ em um caminho de pagamento em potencial entendam o novo recurso. Essa atualização é semelhante a qualquer
+atualização na internet que exige atualizações em nível de hardware na
+parte central do roteamento. No contexto da Lightning Network, no entanto, lidamos
+ apenas com software puro, o que torna essas atualizações mais fáceis de serem implementadas, mas ainda
+exigem uma coordenação muito maior do que qualquer outro mecanismo de atualização na
+rede.
+
+Um exemplo desse tipo de atualização na rede foi a introdução de uma codificação
+TLV para as informações de roteamento codificadas nos pacotes de cebola
+(onion packets). O formato anterior utilizava um formato de mensagem de comprimento fixo codificado 
+manualmente para comunicar informações como o próximo salto.
+Porque esse formato era fixo, isso significava que novas atualizações em nível de protocolo não eram possíveis. A mudança para o formato TLV mais flexível
+significou que, após essa atualização, qualquer tipo de feature que
+modificasse o tipo de informação comunicada em cada salto poderia ser implementada conforme necessário.
+
+Vale ressaltar que a atualização do TLV onion foi uma espécie de atualização "soft" interna
+da rede, no sentido de que, se um pagamento não estivesse utilizando nenhuma feature (recurso) novo além
+além dessa nova codificação de informações de roteamento, então um pagamento poderia ser transmitido
+ usando um conjunto misto de nós.
+
+======= Atualizações de ponta a ponta
+
+((("upgrades","end-to-end")))Para contrastar com a atualização interna da rede, nesta seção descrevemos a
+atualização de rede de _ponta a ponta_ (end-to-end). Esse mecanismo de atualização difere da atualização
+interna da rede, pois requer apenas que as "pontas" do pagamento, o remetente
+e o destinatário, realizem a atualização.
+
+Esse tipo de atualização permite 
+uma ampla variedade de inovação irrestrita dentro da rede. Devido à
+natureza criptografada de cebola dos pagamentos na rede, aqueles que encaminham HTLCs
+no centro da rede podem nem mesmo saber que novos recursos estão sendo
+utilizados. 
+
+Um exemplo de uma atualização de ponta a ponta na rede foi a implementação de pagamentos multipartes (MPP). MPP é um recurso em nível de protocolo que permite que um
+único pagamento seja dividido em várias partes ou caminhos, para serem reunidos no
+destinatário para liquidação. A implementação do MPP foi acompanhada de um novo
+feature bit no nível do `node_announcement`, que indica que o destinatário sabe
+como lidar com pagamentos parciais. Supondo que um remetente e um destinatário saibam um do 
+outro (possivelmente por meio de uma fatura BOLT #11), eles podem usar o novo 
+recurso sem nenhuma negociação adicional.
+
+Outro exemplo de uma atualização de ponta a ponta são os vários tipos de 
+pagamentos _espontâneos_ implementados na rede. Um tipo inicial de
+pagamento espontâneo chamado _keysend_ funcionou simplesmente inserindo a pré-imagem de um pagamento dentro da cebola criptografada. Ao receber, o destinatário descriptografaria a
+pré-imagem e a usaria para liquidar o pagamento. Porque o pacote inteiro é criptografado de ponta a ponta, esse tipo de pagamento era seguro, pois nenhum dos nós intermediários
+é capaz de desembrulhar completamente a cebola para revelar a pré-imagem do pagamento.
+
+==== Atualizações em Nível de Construção de Canal
+
+((("wire protocol","channel construction-level updates")))A última categoria ampla de atualizações são aquelas que ocorrem no
+nível de construção do canal, mas que não modificam a estrutura do HTLC amplamente utilizado dentro da rede. Quando dizemos construção do canal, nos referimos
+ a como o canal é financiado ou criado. Como exemplo, o tipo de canal eltoo
+pode ser implementado na rede usando um novo feature bit no nível de `node_announcement` 
+bem como um feature bit no nível de  `channel_announcement`. Apenas os dois
+pares de nós nos lados dos canais precisam entender e anunciar esses novos
+recursos (features). Esse par de canais pode então ser usado para encaminhar qualquer tipo de pagamento, 
+desde que o canal o suporte.
+
+Outro exemplo é o formato de canal de _anchor outputs_ (saídas de âncora), que permite que a taxa de comprometimento seja 
+ajustada por meio do mecanismo de gerenciamento de taxas Child-Pays-For-Parent (CPFP) do Bitcoin.(((range="endofrange", startref="ix_13_wire_protocol-asciidoc10")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc9")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc8"))).(((range="endofrange", startref="ix_13_wire_protocol-asciidoc7")))(((range="endofrange", startref="ix_13_wire_protocol-asciidoc6")))
+
+=== Conclusão
+
+O protocolo de comunicação (wire protocol) da Lightning é incrivelmente flexível e permite inovação rápida e interoperabilidade sem um consenso estrito. É uma das razões pelas quais a Lightning Network está experimentando um desenvolvimento muito mais rápido e é atraente para muitas pessoas desenvolvedoras, que de outra forma poderiam considerar o estilo de desenvolvimento do Bitcoin muito conservador e lento..(((range="endofrange", startref="ix_13_wire_protocol-asciidoc0")))

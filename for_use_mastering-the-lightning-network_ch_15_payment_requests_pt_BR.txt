@@ -1,0 +1,221 @@
+[[invoices]]
+== Solicitações de Pagamento Relâmpago
+
+((("Lightning invoices", id="ix_15_payment_requests-asciidoc0", range="startofrange")))Neste capítulo, iremos analisar os _pedidos de pagamento do Lightning_, ou como são mais conhecidas, as _Lightning invoices_ (faturas Relâmpago).
+
+=== Faturas no Conjunto de Protocolos Relâmpago
+
+((("Lightning invoices","Lightning Protocol suite and")))((("Lightning Network Protocol","Lightning invoices in")))_Pedidos de pagamento_, também conhecidos como _faturas_, fazem parte da camada de pagamento e são exibidos no canto superior esquerdo da <<LN_payment_request_highlight>>.
+
+[[LN_payment_request_highlight]]
+.Solicitações de pagamento no conjunto de protocolos Lightning
+image::images/mtln_1501.png["Payment requests in the Lightning protocol suite"]
+
+=== Introdução
+
+Conforme aprendemos ao longo do livro, são necessários pelo menos dois dados para 
+concluir um pagamento Relâmpago: um hash de pagamento e um destino. Como
+o SHA-256 é usado na Rede Relâmpago para implementar os HTLCs, essa informação
+requer 32 bytes para ser comunicada. Por outro lado, os destinos são
+simplesmente a chave pública `secp256k1` do nó que deseja receber um pagamento.
+O objetivo de um pedido de pagamento no contexto da Rede Relâmpago é 
+comunicar essas duas informações do remetente para o destinatário. O formato amigável para QR code, usado para comunicar as informações necessárias
+para concluir um pagamento do destinatário para o remetente é descrito em https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding.md[BOLT #11: Invoice Protocol for Lightning Payments]. Na prática, mais do que apenas o
+hash de pagamento e o destino são comunicados em um pedido de pagamento para
+tornar a codificação mais completa.
+
+=== Pedidos de Pagamento Relâmpago versus Endereços Bitcoin
+
+((("Bitcoin addresses, Lightning invoices versus")))((("Lightning invoices","Bitcoin addresses versus")))Uma pergunta comumente feita quando as pessoas encontram pela primeira vez um pedido de pagamento Relâmpago
+é: por que não é possível usar um formato de endereço estático normal em vez disso?
+
+Para responder a essa pergunta, você deve primeiro internalizar como a Relâmpago
+difere do Bitcoin na camada base como método de pagamento. Comparado a um endereço
+ Bitcoin, que pode ser usado para fazer um número potencialmente ilimitado de pagamentos 
+(embora reutilizar um endereço Bitcoin possa comprometer a privacidade), um pedido de pagamento
+Relâmpago deve ser usado apenas _uma vez_. Isso ocorre porque
+enviar um pagamento para um endereço Bitcoin essencialmente usa um sistema de criptografia de 
+chave pública para "codificar" o pagamento de uma maneira que apenas o verdadeiro "dono" 
+daquele endereço Bitcoin pode resgatá-lo.
+
+Em contraste, para completar um pagamento Relâmpago, o destinatário deve 
+revelar um "segredo" a toda a rota de pagamento, incluindo o remetente. Isso pode ser 
+ interpretado como o uso de uma espécie de criptografia simétrica específica do domínio, pois a
+pré-imagem do pagamento é, para fins práticos, um nonce (número usado apenas
+ uma vez). Se o remetente tentar fazer outro pagamento usando aquele mesmo 
+hash de pagamento, ele corre o risco de perder fundos, pois o pagamento pode não ser 
+realmente entregue ao destino. É seguro presumir que, após a pré-imagem ser
+revelada, todos os nós no caminho a manterão indefinidamente. Então, em vez de
+encaminhar o HTLC para coletar uma taxa de roteamento quando o pagamento é
+concluído, eles podem simplesmente liquidar o pagamento naquela instância e receber o
+valor total do pagamento em troca. Portanto, é inseguro usar um pedido
+de pagamento mais de uma vez.
+
+Existem novas variantes do pedido de pagamento original da Relâmpago que permitem que o remetente os reutilize quantas vezes desejar. Essas variantes invertem o fluxo normal de pagamento, pois o remetente transmite uma pré-imagem dentro da carga útil de cebola criptografada para o destinatário, que é o único 
+capaz de descriptografá-lo e liquidar o pagamento. Alternativamente, assumindo
+um mecanismo que permita que o remetente solicite normalmente um novo pedido de pagamento 
+ao destinatário, então um protocolo interativo pode ser usado para permitir 
+um certo grau de reutilização do pedido de pagamento.
+
+=== BOLT #11: Serialização e Interpretação de Pedidos de Pagamento pass:[<span class="keep-together">da Lightning</span>]
+
+((("BOLT (Basis of Lightning Technology) standards documents","Lightning payment request serialization/interpretation")))((("Lightning invoices","payment request serialization/interpretation")))Nesta seção, descreveremos o mecanismo usado para codificar o conjunto de
+ informações necessárias para concluir um pagamento na Rede Relâmpago. Como
+mencionado anteriormente, o hash do pagamento e o destino são a quantidade mínima
+de informações necessárias para concluir um pagamento. No entanto, na prática, mais
+ informações, como informações de prazo (timelock), expiração do pedido de pagamento e
+possivelmente um endereço de fallback on-chain, também são comunicadas. O documento de especificação completo está disponível em https://github.com/lightningnetwork/lightning-rfc/blob/master/11-payment-encoding.md[BOLT #11: Invoice Protocol for Lightning Payments].
+
+==== Codificação de Pedido de Pagamento na Prática
+
+((("Lightning invoices","payment request encoding in practice")))Primeiro, vamos examinar como um pedido de pagamento real se parece na prática. A 
+seguir está um exemplo válido de um pedido de pagamento que poderia ter sido usado para completar um
+pagamento na rede principal da Lightning Network no momento em que foi criada:
+
+----
+lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysx
+xatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatf
+hq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
+----
+
+==== O Prefixo Legível por Humanos
+
+((("human-readable prefixes")))((("Lightning invoices","human-readable prefix")))Olhando a sequência, podemos identificar uma parte que podemos analisar 
+ visualmente, enquanto o restante parece apenas um conjunto aleatório de caracteres. A parte 
+que pode ser analisada por um humano é chamada de _prefixo legível por humanos_. Isso permite que uma pessoa extraia rapidamente algumas informações relevantes de um 
+pedido de pagamento com apenas um olhar. Neste caso, podemos ver que esse pagamento é para
+a instância da rede principal da Lightning Network (lnbc), e está solicitando 2.500
+uBTC (microbitcoin), ou 25.000.000 satoshis. A última parte é referida
+como a porção de dados e usa um formato extensível para codificar 
+as informações necessárias para completar um pagamento.
+
+Cada versão ou instância da Lightning Network (rede principal, rede de testes, etc.) possui
+seu próprio prefixo legível por humanos (veja <<table1501>>). Isso permite que o software cliente e também os humanos
+determinem rapidamente se um pedido de pagamento pode ser atendido pelo seu nó ou não.
+
+[role="pagebreak-before less_space"]
+[[table1501]]
+.Prefixos da rede BOLT #11
+[options="header"]
+|=============================
+|Rede       |Prefixo BOLT #11 
+|mainnet       |`lnbc`
+|testnet       |`lntb`
+|simnet/regtest|`lnbcrt`
+|=============================
+
+
+A primeira parte do prefixo legível por humanos é uma expressão _compacta_ do
+valor do pedido de pagamento. O valor compacto é codificado em duas partes. Primeiro, um número inteiro é usado como o valor _base_. Em seguida, é adicionado um
+multiplicador que nos permite especificar aumentos distintos na ordem de grandeza
+em relação ao valor base. Se retornarmos ao nosso exemplo inicial, podemos
+pegar a parte `2500u` e diminuí-la por um fator de 1.000 para usar
+`2500m`  ou (2.500 mBTC) em vez disso. Como regra geral, para determinar o valor 
+de uma fatura rapidamente, pegue o fator base e o multiplique pelo
+multiplicador.
+
+Uma lista completa dos multiplicadores atualmente definidos é apresentada na <<table1502>>.
+
+[[table1502]]
+.Multiplicadores de valores BOLT #11 
+[options="header"]
+|==============================================
+|Multiplicador|Unidade Bitcoin|Fator de multiplicação
+|`m`|milli|0.001
+|`u`|micro|0.000001
+|`n`|nano|0.000000001
+|`p`|pico|0.000000000001
+|==============================================
+
+
+==== bech32 e o Segmento de Dados
+
+((("bech32, Lightning invoices and")))((("Lightning invoices","bech32 and data segment")))Se a parte "ilegível" parecer familiar, é porque ela usa o
+mesmo esquema de codificação que os endereços Bitcoin compatíveis com SegWit usam atualmente,
+conhecido como bech32. Descrever o esquema de codificação bech32 está fora do escopo 
+deste capítulo. Em resumo, é uma forma sofisticada de codificar sequências curtas
+que possui propriedades muito boas de correção e detecção de erros.
+
+A porção de dados pode ser separada em três seções:
+
+* O carimbo de data/hora (timestamp)
+* Zero ou mais pares de valores-chave marcados
+* A assinatura de toda a fatura
+
+O carimbo de data e hora é expresso em segundos desde o ano de 1970, ou o Unix Epoch. Esse
+carimbo de tempo permite que o remetente determine a idade do pedido de pagamento e, como veremos
+posteriormente, permite ao destinatário forçar uma fatura a ser válida apenas pelo período de
+tempo que ele desejar.
+
+Similar ao formato TLV que aprendemos em <<tlv>>, o formato de fatura BOLT #11
+utiliza uma série de pares chave-valor extensíveis para codificar informações
+necessárias para satisfazer um pagamento. Como pares chave-valor são usados , é fácil adicionar 
+novos valores no futuro caso um novo tipo de pagamento ou requisito/funcionalidade
+adicional seja introduzido.
+
+Por fim, uma assinatura é incluída que abrange todo o pedido de pagamento e é assinada pelo
+destinatário do pagamento. Essa assinatura permite que o remetente verifique que o 
+pedido de pagamento foi realmente criado pelo destinatário do pagamento. Ao contrário 
+dos pedidos de pagamento do Bitcoin que não são assinados, isso nos permite garantir que uma
+entidade específica tenha assinado o pedido de pagamento. A assinatura em si é codificada
+usando um ID de recuperação, que permite o uso de uma assinatura mais compacta que
+permite a extração da chave pública. Ao verificar a assinatura, o ID de recuperação
+extrai a chave pública, e então a verifica em relação à chave pública incluída no pedido
+de pagamento.
+
+===== Campos de Fatura Marcados
+
+((("Lightning invoices","tagged invoice fields")))Os campos marcados da fatura são codificados no corpo principal da fatura. Esses
+campos representam diferentes pares chave-valor que expressam informações
+adicionais que podem ajudar a completar o pagamento ou informações que são
+_obrigatórias_ para completar o pagamento. Como é utilizada uma leve variante do bech32
+cada um desses campos está realmente no domínio "base 5".
+
+Um determinado campo de marcação (tag field) é composto por três componentes:
+
+* O `tipo` do campo (5 bits)
+* O `comprimento` dos dados do campo (10 bits)
+* Os próprios `dados`, que têm tamanho `comprimento * 5 bytes`
+
+Uma lista completa de todos os campos de marcação definidos atualmente é dada em <<table1503>>.
+
+[[table1503]]
+.Campos de fatura marcados no BOLT #11 
+[options="header"]
+|===
+|pass:[<span class="keep-together">Field tag</span>]|pass:[<span class="keep-together">Comprimento dos dados</span>]|Uso
+|`p`|`52`|O hash de pagamento SHA-256.
+|`s`|`52`|Um segredo de 256 bits que aumenta a privacidade de ponta a ponta de um pagamento, mitigando a sondagem por nós intermediários.
+|`d`|Variável|A descrição, uma breve sequência UTF-8 do objetivo do pagamento.
+|`n`|`53`|A chave pública do nó de destino.
+|`h`|`52`|Um hash que representa uma descrição do próprio pagamento. Isso pode ser usado para se comprometer a uma descrição que tenha mais de 639 bytes de comprimento.
+|`x`|Variável|O tempo de expiração, em segundos, do pagamento. O valor padrão é de 1 hora (3.600) se não for especificado.
+|`c`|Variável|O `min_cltv_expiry` a ser usado para o último salto na rota. O valor padrão é 9 se não for especificado.
+|`f`|Variável|Um endereço de fallback on-chain a ser usado para completar o pagamento caso o pagamento não possa ser concluído na Rede Relâmpago.
+|`r`|Variável|Uma ou mais entradas que permitem ao destinatário fornecer ao remetente arestas efêmeras adicionais para completar o pagamento.
+|`9`|Variável|Um conjunto de valores de 5 bits que contêm os feature bits necessários para completar o pagamento.
+|===
+
+Os elementos contidos no campo `r` são comumente chamados de _dicas de roteamento_. Eles permitem que o destinatário comunique um conjunto extra de arestas que podem 
+ajudar o remetente a completar seu pagamento. As dicas de roteamento são geralmente usadas quando o 
+destinatário possui alguns ou todos os canais privados e deseja orientar o remetente para
+essa parte "não mapeada" do grafo de canais. Uma dica de roteamento codifica
+ efetivamente as mesmas informações que uma mensagem de `channel_update` normal.
+A própria atualização é empacotada em um único valor com os seguintes campos:
+
+* A `pubkey` do nó de saída na aresta (264 bits)
+* O `short_channel_id` da aresta "virtual" (64 bits)
+* A taxa base (`fee_base_msat`) da aresta (32 bits)
+* A taxa proporcional (`fee_proportional_millionths`) (32 bits)
+* O delta de expiração do CLTV (`cltv_expiry_delta`) (16 bits)
+
+A parte final do segmento de dados é o conjunto de feature bits que
+comunica ao remetente a funcionalidade necessária para concluir um
+pagamento. Por exemplo, se um novo tipo de pagamento for adicionado no futuro que não seja
+compatível com o tipo de pagamento original (backward compatible), então o destinatário pode definir
+um feature bit _obrigatório_ para comunicar que o pagador precisa
+entender esse recurso para concluir o pagamento.
+
+=== Conclusão
+
+Como vimos, os pedidos de pagamento são muito mais do que apenas uma solicitação de um valor. Eles contêm informações críticas sobre _como_ fazer o pagamento, como dicas de roteamento, a chave pública do nó de destino, chaves efêmeras para aumentar a segurança e muito mais.(((range="endofrange", startref="ix_15_payment_requests-asciidoc0")))

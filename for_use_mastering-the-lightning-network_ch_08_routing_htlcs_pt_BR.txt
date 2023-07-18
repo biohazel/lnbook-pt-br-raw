@@ -1,0 +1,620 @@
+[[routing]]
+== Roteando em uma Rede de pass:[<span class="keep-together">Canais de Pagamento</span>]
+
+((("routing", id="ix_08_routing_htlcs-asciidoc0", range="startofrange")))Neste capítulo, finalmente veremos como os canais de pagamento podem ser conectados para formar uma rede de canais de pagamento por meio de um processo chamado _roteamento_. Especificamente, vamos examinar a primeira parte da camada de roteamento, o protocolo "Atomic and trustless multihop contracts". Isso é destacado por uma desenho do conjunto de protocolos, mostrado na <<LN_protocol_routing_highlight>>.
+
+[[LN_protocol_routing_highlight]]
+.Roteamento de pagamento atômico no conjunto de protocolos Lightning
+image::images/mtln_0801.png["Atomic payment routing in the Lightning protocol suite"]
+
+=== Roteando um Pagamento
+
+((("routing","routing a payment")))Nesta seção, examinaremos o roteamento sob a perspectiva de Dina, uma jogadora que recebe doações de seus fãs enquanto transmite suas sessões de jogo.
+
+A inovação dos canais de pagamento roteados permite que Dina receba gorjetas sem precisar manter um canal separado com cada um de seus fãs que deseja dar gorjeta a ela.
+Contanto que exista um caminho de canais bem financiados do espectador até Dina, ela será capaz de receber o pagamento desse fã.
+
+Na <<dina_routing_diagram>> nós vemos um possível layout de rede criado por vários canais de pagamento entre os nós Lightning. Todos neste diagrama podem enviar um pagamento para Dina construindo um caminho. Imagine que o Fã 4 queira enviar um pagamento para Dina. Você vê o caminho que poderia permitir isso? O Fã 4 poderia rotear um pagamento para Dina através do Fã 3, Bob e Chan. Da mesma forma, Alice poderia rotear um pagamento para Dina através de Bob e Chan.
+
+[[dina_routing_diagram]]
+.Fãs conectados (in)diretamente a Dina na Lightning Network
+image::images/mtln_0802.png["Fans connected (in)directly to Dina on the Lightning Network"]
+
+((("routing nodes")))Os nós ao longo do caminho, do fã até Dina, são intermediários chamados de _nós de roteamento_ no contexto do roteamento de um pagamento. Não há diferença funcional entre os nós de roteamento e os nós operados pelos fãs de Dina. Qualquer nó Lightning é capaz de rotear pagamentos através de seus canais de pagamento.
+
+É importante ressaltar que os nós de roteamento são incapazes de roubar os fundos enquanto roteiam um pagamento de um fã para Dina.
+Além disso, os nós de roteamento não podem perder dinheiro ao participar do processo de roteamento.
+Os nós de roteamento podem cobrar uma taxa de roteamento por atuarem como intermediários, embora não sejam obrigados a fazer isso e possam optar por rotear pagamentos gratuitamente.
+
+Outro detalhe importante é que, devido ao uso do roteamento em camadas (onion routing), os nós intermediários estão cientes explicitamente apenas do nó que os antecede e do nó que os segue na rota.
+Eles não necessariamente saberão quem é o remetente e o destinatário do pagamento.
+Isso permite que os fãs usem nós intermediários para pagar Dina, sem vazar informações privadas e sem correr o risco de roubo.
+
+Esse processo de conectar uma série de canais de pagamento com segurança de ponta a ponta e a estrutura de incentivos para os nós _encaminharem_ pagamentos é uma das principais inovações da Lightning Network.
+
+Neste capítulo, vamos mergulhar no mecanismo de roteamento na Lightning Network, detalhando a maneira precisa pela qual os pagamentos fluem pela rede. Primeiro, vamos esclarecer o conceito de roteamento (routing) e compará-lo ao de busca de caminho (pathfinding), porque esses termos muitas vezes são confundidos e usados ​​indiscriminadamente. Em seguida, vamos construir o protocolo de equidade (justiça): um protocolo atômico, trustless (sem confiança) e multihop (multi-saltos) usado para rotear pagamentos. Para demonstrar como esse protocolo de justiça funciona, usaremos uma equivalência física de transferência de moedas de ouro entre quatro pessoas. Por fim, vamos analisar a implementação do protocolo atomico, confiável e multihop atualmente usado na Lightning Network, chamado de contrato de tempo bloqueado por hash (Hash Time-Locked Contract HTLC).
+
+=== Roteamento versus Busca de Caminho
+
+((("pathfinding","routing versus")))((("routing","pathfinding versus")))É importante ressaltar que separamos o conceito de _roteamento_ do conceito de _busca de caminho_. Esses dois conceitos muitas vezes são confundidos, e o termo _roteamento_ é frequentemente usado para descrever ambos os conceitos. Vamos eliminar a ambiguidade antes de prosseguir.
+
+Pathfinding (busca de caminho), abordada no <<path_finding>>, é o processo de encontrar e escolher um caminho contíguo composto por canais de pagamento que conectam o remetente A ao destinatário B. O remetente de um pagamento realiza a busca de caminho examinando o _channel graph_ (grafo de canais) que eles montaram a partir das divulgações de canais realizadas por outros nós.
+
+Roteamento refere-se à série de interações em toda a rede que tentam encaminhar um pagamento de um ponto A para outro ponto B, ao longo do caminho previamente selecionado pela busca de caminho. O roteamento é o processo ativo de enviar um pagamento em um caminho, o que envolve a cooperação de todos os nós intermediários ao longo desse caminho.
+
+Uma regra importante a ser observada é que é possível que exista um _caminho_ entre Alice e Bob (talvez até mais de um), porém pode não haver uma _rota_ ativa para enviar o pagamento. Um exemplo disso é o cenário em que todos os nós que conectam Alice e Bob estão atualmente offline. Nesse exemplo, é possível examinar o grafo de canais e conectar uma série de canais de pagamento de Alice para Bob, portanto, um _caminho_ existe. No entanto, como os nós intermediários estão offline, o pagamento não pode ser enviado e, portanto, nenhuma _rota_ existe.
+
+=== Criando uma Rede de Canais de Pagamento
+
+((("routing","creating a network of payment channels")))Antes de mergulharmos no conceito de pagamento multihop atômico e sem confiança, vamos ver um exemplo.
+Vamos voltar para Alice, que, nos capítulos anteriores, comprou um café de Bob com quem ela tem um canal aberto.
+Agora, Alice está assistindo a uma transmissão ao vivo de Dina, a jogadora, e quer enviar uma gorjeta de 50.000 satoshis para Dina através da Lightning Network. Mas Alice não tem um canal direto com Dina. O que Alice pode fazer?
+
+Alice pode abrir um canal direto com Dina; no entanto, isso exigiria liquidez e taxas on-chain que podem ser maiores do que o valor da gorjeta em si. Em vez disso, Alice pode usar seus canais abertos existentes para enviar uma gorjeta para Dina _sem_ precisar abrir um canal diretamente com ela. Isso é possível, desde que exista um caminho de canais de Alice para Dina com capacidade suficiente para encaminhar a gorjeta.
+
+Como você pode ver na <<routing_network>>, Alice tem um canal aberto com Bob, o proprietário da cafeteria. Bob, por sua vez, tem um canal aberto com o desenvolvedor de software Chan, que o ajuda com o sistema de ponto de venda que ele usa em sua cafeteria. Chan também é o proprietário de uma grande empresa de software que desenvolve o jogo que Dina joga, e eles já têm um canal aberto que Dina usa para pagar a licença do jogo e itens dentro do jogo.
+
+[[routing_network]]
+.Uma rede de canais de pagamento entre Alice e Dina
+image::images/mtln_0803.png["A network of payment channels between Alice and Dina"]
+
+É possível traçar um _caminho_ de Alice para Dina que utiliza Bob e Chan como nós intermediários de roteamento.
+Então, Alice pode criar uma _rota_ a partir desse caminho e usá-la para enviar uma gorjeta de alguns milhares de satoshis para Dina, com o pagamento sendo _encaminhado_ por Bob e Chan.
+Essencialmente, Alice pagará Bob, que pagará Chan, que pagará Dina. Não é necessário ter um canal direto de Alice para Dina.
+
+O principal desafio é fazer isso de uma forma que impeça Bob e Chan de roubar o dinheiro que Alice deseja enviar para Dina.
+
+=== Um Exemplo Físico de "Roteamento"
+
+((("routing","real-world physical example", id="ix_08_routing_htlcs-asciidoc1", range="startofrange")))Para entender como a Rede Lightning protege o pagamento durante o roteamento, podemos compará-la a um exemplo de roteamento de pagamentos físicos com moedas de ouro no mundo real.
+
+Suponha que Alice queira dar 10 moedas de ouro para Dina, mas não tem acesso direto a Dina. No entanto, Alice conhece Bob, que conhece Chan, que conhece Dina, então ela decide pedir ajuda a Bob e Chan. Isso é mostrado na <<alice_dina_routing_1>>.
+
+[[alice_dina_routing_1]]
+.Alice quer pagar a Dina 10 moedas de ouro
+image::images/mtln_0804.png[]
+
+Alice pode pagar Bob para pagar Chan para pagar Dina, mas como ela pode garantir que Bob ou Chan não peguem as moedas e fujam depois de recebê-las?
+No mundo físico, contratos podem ser usados para realizar uma série de pagamentos com segurança.
+
+Alice poderia negociar um contrato com Bob, que diz:
+
+____
+_Eu, Alice, darei a você, Bob, 10 moedas de ouro se você as repassar para Chan._
+____
+
+Embora esse contrato seja bom na teoria, no mundo real, Alice corre o risco de que Bob possa quebrar o contrato e esperar não ser pego.
+Mesmo que Bob seja capturado e processado, Alice enfrenta o risco de que ele possa estar falido e ser incapaz de devolver suas 10 moedas de ouro.
+Supondo que esses problemas sejam magicamente resolvidos, ainda não está claro como aproveitar tal contrato para alcançar nosso objetivo desejado: entregar as moedas para Dina.
+
+Vamos melhorar nosso contrato para incorporar estas considerações:
+
+____
+_Eu, Alice, vou reembolsar você, Bob, com 10 moedas de ouro se você puder me provar (por exemplo, por meio de um recibo) que você entregou 10 moedas de ouro para Chan._
+____
+
+Você pode se perguntar por que Bob deveria assinar tal contrato.
+Ele teria que pagar a Chan, mas no final não receberia nada em troca, e ele corre o risco de que Alice não o reembolse. Bob poderia oferecer a Chan um contrato semelhante para pagar a Dina, mas da mesma forma, Chan não teria motivo para aceitá-lo também.
+
+Mesmo deixando de lado o risco, Bob e Chan precisam _já ter_ 10 moedas de ouro para enviar; caso contrário, eles não seriam capazes de participar do contrato.
+
+Portanto, Bob e Chan enfrentam tanto o risco quanto o custo de oportunidade ao concordarem com esse contrato, e eles precisariam ser compensados para aceitá-lo.
+
+Alice pode tornar isso atraente tanto para Bob quanto para Chan oferecendo a eles taxas de uma moeda de ouro cada, se eles transmitirem seu pagamento para Dina.
+
+No contrato, então, estaria escrito:
+
+____
+_Eu, Alice, reembolsarei você, Bob, com 12 moedas de ouro se você puder me provar (por exemplo, por meio de um recibo) que você entregou 11 moedas de ouro a Chan._
+____
+
+Alice agora promete a Bob 12 moedas de ouro. São 10 para serem entregues a Dina e 2 como taxas. Ela promete 12 a Bob se ele puder provar que repassou 11 para Chan.
+A diferença de uma moeda de ouro é a taxa que Bob ganhará por ajudar com esse pagamento específico. Na <<alice_dina_routing_2>> vemos como esse arranjo permitiria que 10 moedas de ouro chegassem a Dina por meio de Bob e Chan.
+
+[[alice_dina_routing_2]]
+.Alice paga Bob, Bob paga Chan, Chan paga Dina
+image::images/mtln_0805.png[]
+
+Devido à questão da confiança e ao risco de que Alice ou Bob não cumpram o contrato, todas as partes decidem usar um serviço de custódia.
+No início da transação, Alice poderia "travar" essas 12 moedas de ouro em uma custódia que só será paga a Bob quando ele provar que pagou 11 moedas de ouro para Chan.
+
+Este serviço de custódia é idealizado e não introduz outros riscos (por exemplo, risco de contraparte). Mais tarde, veremos como podemos substituir a custódia por um contrato inteligente do Bitcoin. Por enquanto, vamos supor que todos confiam nesse serviço de custódia.
+
+Na Lightning Network, o comprovante (prova de pagamento) poderia assumir a forma de um segredo que apenas Dina conhece.
+Na prática, esse segredo seria um número aleatório grande o suficiente para evitar que outros o adivinhem (normalmente, um número _muito, muito_ grande, codificado usando 256 bits!).
+
+Dina gera esse valor secreto +R+ de um gerador de números aleatórios.
+
+O segredo poderia então ser comprometido com o contrato incluindo o hash SHA-256 do segredo no próprio contrato, da seguinte forma:
+
+++++
+<ul class="simplelist">
+<li><em>H</em> = SHA-256(<em>R</em>)</li>
+</ul>
+++++
+
+((("payment hash")))((("payment secret (preimage)")))((("preimage (payment secret)")))Chamamos esse hash do segredo do pagamento de _payment hash_.
+O segredo que "desbloqueia" o pagamento é chamado de _payment secret_.
+
+Por enquanto, vamos manter as coisas simples e assumir que o segredo de Dina é simplesmente a linha de texto: `Dinas secret`. Essa mensagem secreta é chamada de _payment secret_ ou _payment preimage_.
+
+Para "comprometer-se" com esse segredo, Dina calcula o hash SHA-256, que quando codificado em hexadecimal, pode ser exibido da seguinte forma:
+
+----
+0575965b3b44be51e8057d551c4016d83cb1fba9ea8d6e986447ba33fe69f6b3
+----
+
+Para facilitar o pagamento de Alice, Dina criará o segredo do pagamento (payment secret) e o hash do pagamento (payment hash), e enviará o hash do pagamento para Alice. Na <<alice_dina_routing_3>> observamos que Dina envia o hash do pagamento para Alice por meio de algum canal externo (linha tracejada), como um e-mail ou mensagem de texto.
+
+[[alice_dina_routing_3]]
+.Dina envia o segredo hasheado para Alice
+image::images/mtln_0806.png["Dina sends the hashed secret to Alice"]
+
+Alice não conhece o segredo, mas ela pode reescrever seu contrato para usar o hash do segredo como prova de pagamento:
+
+____
+_Eu, Alice, vou reembolsá-lo, Bob, com 12 moedas de ouro se você puder me mostrar uma mensagem válida que resulta no hash:`057596`....
+Você pode obter essa mensagem configurando um contrato semelhante com Chan, que deve configurar um contrato semelhante com Dina.
+Para garantir que você seja reembolsado, fornecerei as 12 moedas de ouro a um serviço de custódia confiável antes de você configurar seu próximo contrato._
+____
+
+Este novo contrato agora protege Alice de Bob não encaminhar para Chan, protege Bob de não ser reembolsado por Alice e garante que haverá uma prova de que Dina foi finalmente paga por meio do hash do segredo de Dina.
+
+Depois que Bob e Alice concordarem com o contrato, e Bob receber a mensagem do serviço de custódia de que Alice depositou as 12 moedas de ouro, Bob pode agora negociar um contrato semelhante com Chan.
+
+Observe que, como Bob está cobrando uma taxa de serviço de 1 moeda, ele só encaminhará 11 moedas de ouro para Chan quando Chan mostrar prova de que ele pagou Dina.
+Da mesma forma, Chan também exigirá uma taxa e espera receber 11 moedas de ouro assim que ele provar que pagou a Dina as 10 moedas de ouro prometidas.
+
+O contrato de Bob com Chan será:
+
+____
+_Eu, Bob, reembolsarei você, Chan, com 11 moedas de ouro se você puder me mostrar uma mensagem válida que gere o hash:`057596`....
+Você pode obter essa mensagem configurando um contrato semelhante com Dina.
+Para garantir que você será reembolsado, vou fornecer as 11 moedas de ouro para um agente de custódia confiável antes de você configurar seu próximo contrato._
+____
+
+Uma vez que Chan recebe a mensagem do agente de custódia informando que Bob depositou as 11 moedas de ouro, Chan configura um contrato semelhante com Dina:
+
+____
+_Eu, Chan, vou te reembolsar, Dina, com 10 moedas de ouro se você puder me mostrar uma mensagem válida que tenha o hash de:`057596`....
+Para garantir que você será reembolsado após revelar o segredo, vou fornecer as 10 moedas de ouro a um agente de custódia confiável._
+____
+
+Tudo está agora no lugar.
+Alice tem um contrato com Bob e colocou 12 moedas de ouro em custódia.
+Bob tem um contrato com Chan e colocou 11 moedas de ouro em custódia.
+Chan tem um contrato com Dina e colocou 10 moedas de ouro em custódia.
+Agora cabe a Dina revelar o segredo, que é a pré-imagem do hash que ela estabeleceu como prova de pagamento.
+
+Dina agora envia +Dinas secret+ para Chan.
+
+Chan verifica que +Dinas secret+ é hasheado como +057596+.... Chan agora tem a prova de pagamento e instrui o serviço de custódia a liberar as 10 moedas de ouro para Dina.
+
+Chan agora fornece o segredo para Bob. Bob verifica e instrui o serviço de custódia a liberar as 11 moedas de ouro para Chan.
+
+Bob agora fornece o segredo para Alice.
+Alice verifica e instrui o serviço de custódia a liberar 12 moedas de ouro para Bob.
+
+Todos os contratos já estão liquidados.
+Alice pagou um total de 12 moedas de ouro, sendo que 1 foi recebida por Bob, 1 foi recebida por Chan e 10 foram recebidas por Dina.
+Com uma cadeia de contratos como essa em vigor, Bob e Chan não poderiam fugir com o dinheiro, pois eles o depositaram em custódia primeiro.
+
+No entanto, um problema ainda permanece.
+Se Dina se recusasse a revelar sua pré-imagem secreta, então Chan, Bob e Alice teriam suas moedas presas em custódia, mas não seriam reembolsados.
+E de forma semelhante, se alguém mais ao longo da cadeia deixasse de passar o segredo, a mesma situação aconteceria.
+Portanto, embora ninguém possa roubar dinheiro de Alice, todos teriam seu dinheiro retido permanentemente em depósito.
+
+Felizmente, isso pode ser resolvido adicionando um prazo ao contrato.
+
+Podemos alterar o contrato para que, se não for cumprido dentro de um prazo específico, ele expire e o serviço de custódia devolva o dinheiro à pessoa que fez o depósito original.
+Chamamos esse prazo de _timelock_.
+
+O depósito é bloqueado com o serviço de custódia por um determinado período de tempo e é eventualmente liberado mesmo que nenhuma prova de pagamento tenha sido fornecida.
+
+Para levar isso em consideração, o contrato entre Alice e Bob é novamente alterado com uma nova cláusula:
+
+____
+_Bob tem 24 horas para revelar o segredo após a assinatura do contrato.
+_Se Bob não fornecer o segredo dentro desse prazo, o depósito de Alice será reembolsado pelo serviço de custódia e o contrato se tornará inválido._
+____
+
+Bob, é claro, agora precisa garantir que ele receba a prova de pagamento dentro de 24 horas.
+Mesmo se ele pagar com sucesso a Chan, se ele receber a prova de pagamento após 24 horas, ele não será reembolsado. Para remover esse risco, Bob deve estabelecer um prazo ainda mais curto para Chan.
+
+Por sua vez, Bob alterará seu contrato com Chan da seguinte forma:
+
+____
+_Chan tem 22 horas para mostrar o segredo após a assinatura do contrato.
+Se ele não fornecer o segredo dentro desse prazo, o depósito de Bob será reembolsado pelo serviço de custódia e o contrato será invalidado._
+____
+
+Como você deve ter adivinhado, Chan também alterará seu contrato com Dina:
+
+____
+_Dina tem 20 horas para mostrar o segredo após a assinatura do contrato.
+Se ela não fornecer o segredo até esse momento, o depósito de Chan será devolvido pelo serviço de custódia e o contrato se tornará inválido._
+____
+
+Com essa cadeia de contratos podemos garantir que, após 24 horas, o pagamento passará com sucesso de Alice para Bob para Chan para Dina, ou falhará e todos serão reembolsados.
+Ou o contrato falha ou é bem-sucedido, não há meio termo.
+
+No contexto da Lightning Network, chamamos essa propriedade de "tudo ou nada" de _atomicidade_.
+
+Desde que o serviço de garantia seja confiável e cumpra fielmente suas obrigações, nenhuma das partes terá suas moedas roubadas no processo.
+
+A pré-condição para que essa _rota_ funcione é que todas as partes no caminho tenham dinheiro suficiente para atender à série necessária de depósitos.
+
+Embora isso possa parecer um detalhe menor, veremos mais adiante neste capítulo que esse requisito é realmente um dos problemas mais difíceis para os nós da LN.
+Torna-se progressivamente mais difícil à medida que o tamanho do pagamento aumenta.
+Além disso, as partes não podem usar seu dinheiro enquanto ele estiver bloqueado em custódia.
+
+Assim, os usuários que encaminham pagamentos enfrentam um custo de oportunidade ao bloquear o dinheiro, que é eventualmente reembolsado por meio das taxas de roteamento, como vimos no exemplo anterior.
+
+Agora que vimos um exemplo de roteamento de pagamentos físicos, veremos como isso pode ser implementado na blockchain do Bitcoin, sem a necessidade de um serviço de custódia de terceiros. Para isso, configuraremos os contratos entre os participantes usando o Bitcoin Script. Substituímos o serviço de custódia de terceiros por _smart contracts_ que implementam um protocolo de justiça. Vamos entender esse conceito e implementá-lo!(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc1")))
+
+=== Protocolo de Justiça
+
+((("fairness protocol","routing and")))((("routing","fairness protocol")))Como vimos no primeiro capítulo deste livro, a inovação do Bitcoin está na capacidade de usar primitivas criptográficas para implementar um protocolo de justiça que substitui a confiança em terceiros (intermediários) por um protocolo confiável.
+
+No nosso exemplo das moedas de ouro, precisamos de um serviço de custódia para evitar que qualquer uma das partes descumprisse suas obrigações. A inovação dos protocolos criptográficos de justiça nos permite substituir o serviço de custódia por um protocolo.
+
+((("fairness protocol","properties")))As propriedades do protocolo de justiça que queremos criar são:
+
+Operação sem confiança:: Os participantes de um pagamento roteado não precisam confiar uns nos outros, ou em qualquer intermediário ou terceiro. Em vez disso, eles confiam no protocolo para protegê-los de trapaças.
+
+Atomicidade:: Ou o pagamento é totalmente executado, ou falha e todos são reembolsados. Não há possibilidade de um intermediário cobrar um pagamento roteado e não encaminhá-lo para o próximo salto (hop). Assim, os intermediários não podem trapacear ou roubar.
+
+Multi-salto:: A segurança do sistema se estende de ponta a ponta para pagamentos roteados por vários canais de pagamento, assim como ocorre em um pagamento entre as duas pontas de um único canal de pagamento.
+
+Uma propriedade opcional e adicional é a capacidade de dividir pagamentos em várias partes, mantendo a atomicidade para o pagamento inteiro. Isso é chamado de _pagamentos multipartes_ (_MPP_, Multipart Payments) e será explorado mais detalhadamente em <<mpp>>.
+
+==== Implementando Pagamentos Atômicos Sem Confiança Multi-Salto
+
+((("fairness protocol","implementing atomic trustless multihop payments")))((("routing","implementing atomic trustless multihop payments")))Bitcoin Script é flexível o suficiente para permitir dezenas de maneiras de implementar um protocolo de justiça com as propriedades de atomicidade, operação sem confiança e segurança multihop. A escolha de uma implementação específica depende de certas compensações entre privacidade, eficiência e complexidade.
+
+((("hash time-locked contracts (HTLCs)","fairness protocol")))O protocolo de justiça usado atualmente no roteamento da Lightning Network é chamado de contrato de tempo bloqueado por hash (HTLC, na sigla em inglês). Os HTLCs usam uma pré-imagem de hash como o segredo que desbloqueia um pagamento, como vimos no exemplo das moedas de ouro neste capítulo. O destinatário de um pagamento gera um número secreto aleatório e calcula seu hash. O hash se torna a condição do pagamento e, uma vez que o segredo é revelado, todos os participantes podem resgatar seus pagamentos recebidos. Os HTLCs oferecem atomicidade, operação sem confiança e segurança multihop (multi-salto).
+
+((("Point Time-Locked Contract (PTLC)")))((("PTLC (Point Time-Locked Contract)")))Outro mecanismo proposto para implementar o roteamento é um Contrato Bloqueado por Ponto no Tempo (PTLC, Point Time-Locked Contract). Os PTLCs também alcançam atomicidade, operação sem confiança e segurança multihop, mas o fazem com maior eficiência e melhor privacidade. A implementação eficiente dos PTLCs depende de um novo algoritmo de assinatura digital chamado _assinaturas Schnorr_, que se espera ser ativado no Bitcoin em 2021.
+
+=== Revisitando o Exemplo da Gorjeta
+
+((("routing","real-world physical example")))Vamos revisitar nosso exemplo da primeira parte deste capítulo. Alice quer dar uma gorjeta para Dina com um pagamento na Lightning. Digamos que Alice queira enviar 50.000 satoshis para Dina como gorjeta.
+
+Para que Alice pague Dina, Alice precisará que o nó de Dina gere uma fatura na Lightning. Discutiremos isso com mais detalhes no <<invoices>>. Por enquanto, vamos supor que Dina tenha um website que possa produzir uma fatura na Lightning para gorjetas.
+
+[DICA]
+====
+Pagamentos na Lightning podem ser enviados sem uma fatura usando um recurso chamado _keysend_, que discutiremos com mais detalhes em <<keysend>>. Por enquanto, vamos explicar o fluxo de pagamento mais simples usando uma fatura.
+====
+
+Alice visita o site de Dina, insere a quantia de 50.000 satoshis em um formulário e, em resposta, o nó da Lightning de Dina gera uma solicitação de pagamento de 50.000 satoshis na forma de uma fatura da Lightning. Essa interação ocorre pela web e fora da Lightning Network, como mostrado na <<alice_dina_invoice_1>>.
+
+[[alice_dina_invoice_1]]
+.Alice solicita fatura no site da Dina
+image::images/mtln_0807.png["Alice requests an invoice from Dina's website"]
+
+Como vimos em exemplos anteriores, supomos que Alice não possui um canal de pagamento direto para Dina. Em vez disso, Alice possui um canal com Bob, Bob possui um canal com Chan e Chan possui um canal com Dina. Para pagar Dina, Alice deve encontrar um caminho que a conecte a Dina. Discutiremos esse passo em mais detalhes no <<path_finding>>. Por enquanto, vamos supor que Alice consiga reunir informações sobre os canais disponíveis e veja que existe um caminho dela para Dina, passando por Bob e Chan.
+
+[OBSERVAÇÃO]
+====
+Lembre-se de como Bob e Chan podem esperar uma pequena compensação por encaminhar o pagamento por meio de seus nós? Alice quer pagar 50.000 satoshis a Dina, mas, como veremos nas seções seguintes, ela enviará 50.200 satoshis para Bob. Os 200 satoshis extras pagarão 100 satoshis cada para Bob e Chan, como taxa de roteamento.
+====
+
+Agora, o nó de Alice pode construir um pagamento da Lightning. Nas próximas seções, veremos como o nó de Alice constrói um HTLC para pagar Dina e como esse HTLC é encaminhado ao longo do caminho de Alice para Dina.
+
+
+==== Liquidação On-Chain Versus Off-Chain de HTLCs
+
+((("hash time-locked contracts (HTLCs)","on-chain versus off-chain settlement of")))((("off-chain settlement, on-chain payment versus")))((("on-chain payment","off-chain settlement versus")))((("routing","on-chain versus off-chain settlement of HTLCs")))O objetivo da Lightning Network é permitir transações _off-chain_ (fora da cadeia de blocos) que sejam tão confiáveis quanto as transações on-chain (dentro da cadeia de blocos), porque ninguém pode trapacear. A razão pela qual ninguém pode trapacear é porque a qualquer momento, qualquer um dos participantes pode levar suas transações fora da cadeia para dentro da cadeia. Cada transação fora da cadeia está pronta para ser enviada para a blockchain do Bitcoin a qualquer momento. Assim, a blockchain do Bitcoin atua como um mecanismo de resolução de disputas e liquidação final, se necessário.
+
+O simples fato de que qualquer transação pode ser levada para a blockchain a qualquer momento é precisamente o motivo pelo qual todas essas transações podem ser mantidas fora da cadeia. Se você sabe que tem uma solução de recurso, pode continuar cooperando com os outros participantes e evitar a necessidade de liquidação na cadeia e taxas adicionais.
+
+Em todos os exemplos que seguem, vamos assumir que qualquer uma dessas transações pode ser realizada on-chain a qualquer momento. Os participantes escolherão mantê-las off-chain, mas não há diferença na funcionalidade do sistema, exceto pelas taxas mais altas e pelo atraso imposto pela mineração das transações na blockchain. O exemplo funciona da mesma forma se todas as transações forem realizadas na blockchain ou fora dela.
+
+[[htlcs]]
+=== Contratos de Hash Bloqueados por Tempo (HTLC)
+
+((("hash time-locked contracts (HTLCs)","mechanism of operation", id="ix_08_routing_htlcs-asciidoc2", range="startofrange")))((("routing","hash time-locked contracts mechanism of operation", id="ix_08_routing_htlcs-asciidoc3", range="startofrange")))Nesta sessão explicamos como HTLCs funcionam.
+
+A primeira parte de um HTLC é o _hash_. Isso se refere ao uso de um algoritmo de hash criptográfico para se comprometer com um segredo gerado aleatoriamente. O conhecimento desse segredo permite a realização do pagamento. A função de hash criptográfica garante que seja praticamente impossível para alguém adivinhar a pré-imagem do segredo, mas é fácil para qualquer pessoa verificar o hash, e só há uma pré-imagem possível que resolve a condição de pagamento.
+
+Na <<alice_dina_invoice_2>> vemos Alice recebendo uma fatura Relâmpago de Dina. Dentro dessa fatura ((("payment hash")))Dina codificou um _hash de pagamento_, que é o hash criptográfico de um segredo produzido pelo nó de Dina. ((("payment secret (preimage)")))((("preimage (payment secret)")))O segredo de Dina é chamado de _pré-imagem de pagamento_. O hash de pagamento atua como um identificador que pode ser usado para rotear o pagamento até Dina. A pré-imagem de pagamento atua como um recibo e prova de pagamento uma vez que o pagamento estiver completo.
+
+[[alice_dina_invoice_2]]
+.Alice recebe um hash de pagamento de Dina
+image::images/mtln_0808.png["Alice gets a payment hash from Dina"]
+
+Na Lightning Network, a pré-imagem de pagamento de Dina não será uma frase como +Dinas secret+, mas sim um número aleatório gerado pelo nó de Dina. Vamos chamar esse número aleatório de _R_.
+
+O nó de Dina calculará um hash criptográfico de _R_, tal que:
+
+++++
+<ul class="simplelist">
+<li><em>H</em> = SHA-256(<em>R</em>)</li>
+</ul>
+++++
+
+Nesta equação, _H_ é o hash, ou _payment hash_ e _R_ é o segredo ou _payment preimage_.
+
+O uso de uma função de hash criptográfica é um elemento que garante a _operação sem confiança_. Os intermediários de pagamento não precisam confiar uns nos outros porque eles sabem que ninguém pode adivinhar o segredo ou falsificá-lo.
+
+==== HTLCs em Bitcoin Script
+
+((("Bitcoin script","HTLCs in")))((("hash time-locked contracts (HTLCs)","Bitcoin Script and")))No nosso exemplo das moedas de ouro, Alice tinha um contrato aplicado por uma garantia como esta:
+
+____
+_Alice reembolsará Bob com 12 moedas de ouro se ele puder mostrar uma mensagem válida que faça hash para:_ +0575...f6b3+. _Bob tem 24 horas para mostrar o segredo após a assinatura do contrato. Se Bob não fornecer o segredo dentro desse prazo, o depósito de Alice será reembolsado pelo serviço de garantia e o contrato será considerado inválido._
+____
+
+[role="pagebreak-before"]
+Vamos ver como implementar isso como um HTLC em Bitcoin Script. No <<received_htlc>> nós vemos um Bitcoin Script HTLC como usado atualmente na Rede Relâmpago. Você pode encontrar esta definição em https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md#offered-htlc-outputs[BOLT #3, Transactions].
+
+[[received_htlc]]
+.HTLC implementado em Bitcoin Script (BOLT #3)
+[source,text,linenums]
+====
+----
+# To remote node with revocation key
+OP_DUP OP_HASH160 <RIPEMD160(SHA256(revocationpubkey))> OP_EQUAL
+OP_IF
+    OP_CHECKSIG
+OP_ELSE
+    <remote_htlcpubkey> OP_SWAP OP_SIZE 32 OP_EQUAL
+    OP_IF
+        # To local node via HTLC-success transaction.
+        OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY
+        2 OP_SWAP <local_htlcpubkey> 2 OP_CHECKMULTISIG
+    OP_ELSE
+        # To remote node after timeout.
+        OP_DROP <cltv_expiry> OP_CHECKLOCKTIMEVERIFY OP_DROP
+        OP_CHECKSIG
+    OP_ENDIF
+OP_ENDIF
+----
+====
+
+Nossa, parece complicado! Não se preocupe, vamos dar um passo de cada vez e simplificá-lo.
+
+O Bitcoin Script atualmente usado na Rede Lightning é bastante complexo, pois é otimizado para eficiência de espaço on-chain, o que o torna muito compacto, porém difícil de ler.
+
+Nas seções a seguir, vamos nos concentrar nos principais elementos do script e apresentar scripts simplificados que são ligeiramente diferentes do que é realmente usado na Lightning.
+
+A parte principal do HTLC está na linha 10 do  <<received_htlc>>. Vamos construí-lo do zero!
+
+==== Pré-imagem de Pagamento e Verificação de Hash
+
+((("hash time-locked contracts (HTLCs)","payment preimage and hash verification")))((("hash verification")))((("payment secret (preimage)")))((("preimage (payment secret)")))O cerne de um HTLC é o hash, onde o pagamento pode ser feito se o destinatário conhecer a pré-imagem do pagamento. Alice bloqueia o pagamento para um hash de pagamento específico, e Bob deve apresentar uma pré-imagem de pagamento para reivindicar os fundos. O sistema Bitcoin pode verificar se a pré-imagem de pagamento de Bob está correta, fazendo o hash dela e comparando o resultado com o hash de pagamento que Alice usou para bloquear os fundos.
+
+Essa parte de um HTLC pode ser implementada no Bitcoin Script da seguinte maneira:
+
+----
+OP_SHA256 <H> OP_EQUAL
+----
+
+Alice pode criar uma transação de saída que paga 50.200 satoshis com um script de bloqueio acima, substituindo `<H>` pelo valor do hash +0575...f6b3+ fornecido por Dina. Em seguida, Alice pode assinar essa transação e oferecê-la a Bob:
+
+.Alice's offers a 50,200 satoshi HTLC to Bob
+----
+OP_SHA256 0575...f6b3 OP_EQUAL
+----
+
+Bob não pode gastar esse HTLC até que ele saiba o segredo de Dina, portanto, gastar o HTLC é condicionado ao cumprimento do pagamento por Bob até Dina.
+
+Depois que Bob obtiver o segredo de Dina, ele poderá gastar essa saída com um script de desbloqueio contendo o valor da pré-imagem secreta _R_.
+
+A combinação do script de desbloqueio com o script de bloqueio resultaria em:
+
+----
+<R> OP_SHA256 <H> OP_EQUAL
+----
+
+O mecanismo Bitcoin Script avaliaria esse script da seguinte forma:
+
+1. +R+ é colocado na pilha.
+2. O operador `OP_SHA256` pega o valor +R+ da pilha e faz o hash, colocando o resultado +H~R~+ na pilha.
+3. +H+ é colocado na pilha.
+4. O operador `OP_EQUAL` compara +H+ e +H~R~+. Se forem iguais, o resultado é +TRUE+, o script está completo e o pagamento é verificado.
+
+==== Estendendo HTLCs de Alice para Dina
+
+((("hash time-locked contracts (HTLCs)","extending across a network")))Agora, Alice irá estender o HTLC através da rede para que ele alcance Dina.
+
+Na <<alice_dina_htlc_1>>, nós vemos o HTLC propagado pela rede de Alice para Dina. Alice deu a Bob um HTLC de 50.200 satoshis. Agora, Bob pode criar um HTLC de 50.100 satoshis e entregá-lo para Chan.
+
+Bob sabe que Chan não pode resgatar o HTLC de Bob sem transmitir o segredo, momento em que Bob também pode usar o segredo para resgatar o HTLC de Alice. Este é um ponto muito importante porque garante a _atomicidade_ ponta a ponta do HTLC. Para gastar o HTLC, é necessário revelar o segredo, o que possibilita que outras pessoas também gastem seus HTLCs. Ou todos os HTLCs são resgatáveis, ou nenhum dos HTLCs é resgatável: atomicidade!
+
+Como o HTLC de Alice é 100 satoshis a mais do que o HTLC que Bob deu a Chan, Bob receberá 100 satoshis como taxa de roteamento se esse pagamento for concluído.
+
+Bob não está correndo riscos e não está confiando em Alice ou Chan. Em vez disso, Bob está confiando que uma transação assinada, juntamente com o segredo, será resgatável na blockchain do Bitcoin.
+
+[[alice_dina_htlc_1]]
+.Propagando o HTLC pela rede
+image::images/mtln_0809.png["Propagating the HTLC across the network"]
+
+Da mesma forma, Chan pode estender um HTLC de 50.000 para Dina. Ele não está arriscando nada ou confiando em Bob ou Dina. Para resgatar o HTLC, Dina teria que transmitir o segredo, que Chan poderia usar para resgatar o HTLC de Bob. Chan também ganharia 100 satoshis como taxa de roteamento.
+
+==== Retropropagando o Segredo
+
+((("hash time-locked contracts (HTLCs)","back-propagating the secret", id="ix_08_routing_htlcs-asciidoc4", range="startofrange")))Depois que Dina recebe um HTLC de 50.000 de Chan, ela agora pode receber o pagamento. Dina poderia simplesmente comprometer esse HTLC na cadeia e gastá-lo revelando o segredo na transação de gasto. Ou, em vez disso, Dina pode atualizar o saldo do canal com Chan, fornecendo a ele o segredo. Não há motivo para incorrer em uma taxa de transação e ir para a cadeia (on-chain). Então, em vez disso, Dina envia o segredo para Chan, e eles concordam em atualizar seus saldos de canal para refletir um pagamento Lightning de 50.000 satoshis para Dina. Na <<alice_dina_htlc_redeem_1>> nós vemos Dina dando o segredo para Chan, cumprindo assim o HTLC.
+
+[[alice_dina_htlc_redeem_1]]
+.Dina liquida o HTLC de Chan fora da cadeia (off-chain)
+image::images/mtln_0810.png["Dina settles Chan's HTLC off-chain"]
+
+Observe que o saldo do canal de Dina passa de 50.000 satoshis para 100.000 satoshis. O saldo do canal de Chan é reduzido de 200.000 satoshis para 150.000 satoshis. A capacidade do canal não mudou, mas 50.000 satoshis foram transferidos do lado de Chan do canal para o lado de Dina do canal.
+
+Agora, Chan tem o segredo e pagou a Dina 50.000 satoshis. Ele pode fazer isso sem nenhum risco, porque o segredo permite que Chan resgate o HTLC de 50.100 de Bob. Chan tem a opção de comprometer esse HTLC na cadeia e gastá-lo revelando o segredo na blockchain do Bitcoin. Mas, assim como Dina, ele prefere evitar taxas de transação. Então, em vez disso, ele envia o segredo para Bob para que eles possam atualizar seus saldos de canal para refletir um pagamento Lightning de 50.100 satoshis de Bob para Chan. Na <<alice_dina_htlc_redeem_2>> nós vemos Chan enviando o segredo para Bob e recebendo um pagamento em troca.
+
+[[alice_dina_htlc_redeem_2]]
+.Chan liquida o HTLC de Bob off-chain
+image::images/mtln_0811.png["Chan settles Bob's HTLC off-chain"]
+
+Chan pagou 50.000 satoshis para Dina e recebeu 50.100 satoshis de Bob. Portanto, Chan possui 100 satoshis a mais em seus saldos de canal, que ele ganhou como taxa de roteamento.
+
+Agora, Bob também possui o segredo. Ele pode usá-lo para gastar o HTLC de Alice na cadeia. Ou, ele pode evitar taxas de transação ao liquidar o HTLC no canal com Alice. Na <<alice_dina_htlc_redeem_3>> nós vemos que Bob envia o segredo para Alice e eles atualizam o saldo do canal para refletir um pagamento Lightning de 50.200 satoshi de Alice para Bob.
+
+[[alice_dina_htlc_redeem_3]]
+.Bob liquida o HTLC de Alice off-chain
+image::images/mtln_0812.png["Bob settles Alice's HTLC off-chain"]
+
+Bob recebeu 50.200 satoshi de Alice e pagou 50.100 satoshi para Chan, então ele tem um extra de 100 satoshi em seus saldos de canal provenientes das taxas de roteamento.
+
+Alice recebe o segredo e liquidou o HTLC de 50.200 satoshi. O segredo pode ser usado como um _recibo_ para provar que Dina foi paga para aquele hash de pagamento específico.
+
+Os saldos finais do canal refletem o pagamento de Alice para Dina e as taxas de roteamento pagas em cada salto, conforme mostrado na <<alice_dina_htlc_redeem_4>>.(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc4")))
+
+[[alice_dina_htlc_redeem_4]]
+.Saldos do canal após o pagamento
+image::images/mtln_0813.png["Channel balances after the payment"]
+
+[[preventing_theft]]
+==== Vinculação de Assinatura: Prevenindo o Roubo de HTLCs
+
+((("hash time-locked contracts (HTLCs)","signature binding to prevent theft of", id="ix_08_routing_htlcs-asciidoc5", range="startofrange")))((("signature binding", id="ix_08_routing_htlcs-asciidoc6", range="startofrange")))Há uma pegadinha. Você notou?
+
+Se Alice, Bob e Chan criarem os HTLCs conforme mostrado na <<alice_dina_htlc_redeem_4>>, eles enfrentam um pequeno, mas não insignificante, risco de perda. Qualquer um desses HTLCs pode ser resgatado (gasto) por qualquer pessoa que conheça o segredo. Inicialmente, apenas Dina conhece o segredo. Dina deve gastar apenas o HTLC de Chan. Mas Dina poderia gastar os três HTLCs de uma só vez, ou até mesmo em uma única transação de gasto! Afinal, Dina conhece o segredo antes de qualquer outra pessoa. Da mesma forma, uma vez que Chan conhece o segredo, ele só deve gastar o HTLC oferecido por Bob. Mas e se Chan também gastar o HTLC oferecido por Alice?
+
+Isso não é _sem confiança_! Ele falha no recurso de segurança mais importante. Precisamos consertar isso.
+
+O script do HTLC deve ter uma condição adicional que vincula cada HTLC a um destinatário específico. Isso é feito exigindo uma assinatura digital que corresponda à chave pública de cada destinatário, impedindo assim que qualquer outra pessoa gaste aquele HTLC. Como apenas o destinatário designado tem a capacidade de produzir uma assinatura digital correspondente àquela chave pública, somente o destinatário designado pode gastar aquele HTLC.
+
+Vamos analisar os scripts novamente levando em consideração essa modificação. O HTLC de Alice para Bob é modificado para incluir a chave pública de Bob e o operador +OP_CHECKSIG+.
+
+Aqui está o script HTLC modificado:
+
+----
+OP_SHA256 <H> OP_EQUALVERIFY <Bob's Pub> OP_CHECKSIG
+----
+
+[DICA]
+====
+Observe que também alteramos o +OP_EQUAL+ para +OP_EQUALVERIFY+. Quando um operador possui o sufixo +VERIFY+, ele não retorna +TRUE+ ou +FALSE+ na pilha. Em vez disso, ele _interrompe_ a execução e falha o script se o resultado for falso e continua sem nenhuma saída na pilha se for verdadeiro.
+====
+
+Para resgatar esse HTLC, Bob deve apresentar um script de desbloqueio que inclua uma assinatura da chave privada de Bob, bem como a pré-imagem secreta do pagamento, como este exemplo:
+
+----
+<Bob's Signature> <R>
+----
+
+Os scripts de desbloqueio e bloqueio são combinados e avaliados pelo mecanismo de script, como segue:
+
+----
+<Bob's Sig> <R> OP_SHA256 <H> OP_EQUALVERIFY <Bob's Pub> OP_CHECKSIG
+----
+
+1. +<Bob's Sig> + é colocado na pilha.
+2. +R+ é colocado na pilha.
+3. +OP_SHA256+ retira e faz o hash do valor +R+ do topo da pilha e coloca o resultado +H~R~+ na pilha.
+4. +H+ é colocado na pilha.
+5. +OP_EQUALVERIFY+ mostra +H+ e +H~R~+ e os compara. Se não forem iguais, a execução é interrompida. Caso contrário, continuamos sem saída para a pilha.
+6. A chave pública de Bob, +<Bob's Pub>+, é inserida na pilha.
+7. +OP_CHECKSIG+ retira +<Bob's Sig>+ e +<Bob's Pub>+ da pilha e verifica a assinatura. O resultado (`TRUE/FALSE`) é inserido na pilha.
+
+Como você pode ver, isso é um pouco mais complicado, mas agora corrigimos o HTLC e garantimos que apenas o destinatário pretendido possa gastá-lo.(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc6")))(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc5")))
+
+==== Otimização de Hash
+
+((("hash time-locked contracts (HTLCs)","hash optimization")))Vamos dar uma olhada na primeira parte do script do HTLC até agora:
+
+----
+OP_SHA256 <H> OP_EQUALVERIFY
+----
+
+Se olharmos isso na representação simbólica anterior, parece que os operadores +OP_+ ocupam a maior parte do espaço. Mas isso não é verdade. O Bitcoin Script é codificado em binário, sendo que cada operador representa um byte. Enquanto isso, o valor +<H>+ que usamos como marcador de posição para o hash de pagamento é um valor de 32 bytes (256 bits). Você pode encontrar uma lista de todos os operadores do Bitcoin Script e sua codificação binária e hexadecimal em https://en.bitcoin.it/wiki/Script[Bitcoin Wiki: Script], ou em https://github.com/bitcoinbook/bitcoinbook/blob/develop/appdx-scriptops.asciidoc[Appendix D, "Transaction Script Language Operators, Constants, and Symbols," in _Mastering Bitcoin_].
+
+Representado em hexadecimal, nosso script HTLC ficaria assim:
+
+----
+a8 0575965b3b44be51e8057d551c4016d83cb1fba9ea8d6e986447ba33fe69f6b3 88
+----
+
+Na codificação hexadecimal, +OP_SHA256+ é +a8+ e +OP_EQUALVERIFY+ é +88+. O comprimento total deste script é de 34 bytes, dos quais 32 bytes são o hash.
+
+Conforme mencionado anteriormente, qualquer participante na Lightning Network deve ser capaz de pegar uma transação off-chain que possuem e levá-la para a blockchain se precisarem executar sua reivindicação aos fundos. Para levar uma transação para a cadeia de blocos, eles precisariam pagar taxas de transação aos mineradores, e essas taxas são proporcionais ao tamanho, em bytes, da transação.
+
+Portanto, queremos encontrar maneiras de minimizar o "peso" das transações on-chain, otimizando o script o máximo possível. Uma maneira de fazer isso é adicionar outra função de hash em cima do algoritmo SHA-256, uma que produza hashes menores. A linguagem Bitcoin Script fornece o operador +OP_HASH160+ que "faz o hash duas vezes" de uma pré-imagem: primeiro a pré-imagem é hasheada com SHA-256 e, em seguida, o hash resultante é hasheado novamente com o algoritmo de hash RIPEMD160. O hash resultante do RIPEMD160 tem 160 bits ou 20 bytes, o que é muito mais compacto. No Bitcoin Script, essa é uma otimização muito comum que é usada em muitos dos formatos de endereço comuns.
+
+Então, vamos usar essa otimização em vez disso. Nosso hash SHA-256 é +057596...69f6b3+. Passando por mais uma rodada de hashing com RIPEMD160, obtemos o resultado:
+
+----
+R = "Dinas secret"
+H256 = SHA256(R)
+H256 = 0575965b3b44be51e8057d551c4016d83cb1fba9ea8d6e986447ba33fe69f6b3
+H160 = RIPEMD160(H256)
+H160 = 9e017f6767971ed7cea17f98528d5f5c0ccb2c71
+----
+
+Alice pode calcular o hash RIPEMD160 do hash de pagamento que Dina fornece e usar o hash mais curto em seu HTLC, assim como Bob e Chan podem fazer o mesmo!
+
+[role="pagebreak-before"]
+O script "otimizado" do HTLC ficaria assim:
+
+----
+OP_HASH160 <H160> OP_EQUALVERIFY
+----
+
+Codificado em hexadecimal, é assim:
+
+----
+a9 9e017f6767971ed7cea17f98528d5f5c0ccb2c71 88
+----
+
+Onde +OP_HASH160+ é +a9+ e +OP_EQUALVERIFY+ é +88+. Este script tem apenas 22 bytes de comprimento! Economizamos 12 bytes em cada transação que resgata um HTLC on-chain.
+
+Com essa otimização, agora você pode ver como chegamos ao script HTLC mostrado na linha 10 do <<received_htlc>>:
+
+----
+...
+    # To local node via HTLC-success transaction.
+    OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY...
+----
+
+==== HTLC Cooperativo e Falha por Tempo Limite
+
+((("cooperative failure")))((("hash time-locked contracts (HTLCs)","cooperative/timeout failure")))((("timeout failure")))Até agora, analisamos a parte do "hash" do HTLC e como funcionaria se todos cooperassem e estivessem online no momento do pagamento.
+
+O que acontece se alguém ficar offline ou não cooperar? O que acontece se o pagamento não for bem-sucedido?
+
+Precisamos garantir uma maneira de "falhar de forma graciosa", pois falhas ocasionais no roteamento são inevitáveis. Existem duas formas de falhar: cooperativamente e com um reembolso bloqueado por tempo.
+
+A falha cooperativa é relativamente simples: o HTLC é desfeito por todos os participantes do caminho, removendo a saída do HTLC de suas transações de compromisso sem alterar o saldo. Vamos analisar como isso funciona em detalhes no <<channel_operation>>.
+
+Vamos analisar como podemos reverter um HTLC sem a cooperação de um ou mais participantes. Precisamos garantir que, se um dos participantes não cooperar, os fundos não fiquem simplesmente bloqueados no HTLC _para sempre_. Isso daria a alguém a oportunidade de reter os fundos de outro participante como resgate: "Eu vou deixar seus fundos bloqueados para sempre se você não me pagar resgate."
+
+Para evitar isso, cada script do HTLC inclui uma cláusula de reembolso que está vinculada a um tempo de bloqueio. Lembra do nosso contrato de garantia original? "Bob tem 24 horas para mostrar o segredo depois que o contrato é assinado. Se Bob não fornecer o segredo até esse momento, o depósito de Alice será reembolsado."
+
+O reembolso bloqueado por tempo é uma parte importante do script que garante a _atomicidade_, para que o pagamento ponta a ponta inteiro tenha sucesso ou falhe de forma graciosa. Não há um estado de "meio pago" com o qual se preocupar. Em caso de falha, cada participante pode desfazer cooperativamente o HTLC com seu parceiro de canal ou colocar unilateralmente a transação de reembolso bloqueado por tempo na cadeia on-chain) para recuperar seu dinheiro.
+
+Para implementar esse reembolso no Bitcoin Script, usamos um operador especial pass:[<code>O&#x2060;P&#x2060;_&#x2060;C&#x2060;H&#x2060;E&#x2060;C&#x2060;K&#x2060;L&#x2060;O&#x2060;C&#x2060;K&#x2060;T&#x2060;I&#x2060;M&#x2060;E&#x200b;V&#x2060;E&#x2060;R&#x2060;I&#x2060;F&#x2060;Y</code>] também conhecido como +OP_CLTV+ em resumo. Aqui está o script, como visto anteriormente na linha 13 do <<received_htlc>>:
+
+----
+...
+	OP_DROP <cltv_expiry> OP_CHECKLOCKTIMEVERIFY OP_DROP
+	OP_CHECKSIG
+...
+----
+
+O operador +OP_CLTV+ pega um tempo de expiração definido como a altura do bloco após a qual essa transação é válida. Se o tempo de bloqueio da transação não for definido como o mesmo que +<cltv_expiry>+, a avaliação do script falha e a transação é inválida. Caso contrário, o script continua sem nenhuma saída na pilha. Lembre-se de que o sufixo +VERIFY+ significa que esse operador não gera as saídas +TRUE+ ou +FALSE+, mas, em vez disso, ele interrompe/falha ou continua sem saída na pilha.
+
+Essencialmente, o +OP_CLTV+ atua como um "porteiro", impedindo que o script prossiga caso a altura do bloco +<cltv_expiry>+ não foi atingida na blockchain do Bitcoin.
+
+O operador +OP_DROP+ simplesmente derruba o item mais acima da pilha de script. Isso é necessário no início porque há um item "excedente" das linhas de script anteriores. É necessário _após_ o +OP_CLTV+ para remover o item +<cltv_expiry>+  do topo da pilha porque não é mais necessário.
+
+Finalmente, após a limpeza da pilha, deve restar uma chave pública e uma assinatura que o +OP_CHECKSIG+ pode verificar. Como vimos em <<preventing_theft>>, isso é necessário para garantir que apenas o legítimo proprietário dos fundos possa reivindicá-los, vinculando essa saída à sua chave pública e exigindo uma assinatura.
+
+==== Bloqueios de Tempo Decrementais
+
+((("hash time-locked contracts (HTLCs)","decrementing timelocks")))À medida que os HTLCs são estendidos de Alice para Dina, a cláusula de reembolso bloqueada por tempo (time-locked refund clause) em cada HTLC possui um valor de +cltv_expiry+ _diferente_. Veremos isso com mais detalhes no <<onion_routing>>. Mas basta dizer que, para garantir um desenrolar ordenado de um pagamento que falha, cada salto precisa esperar um pouco menos pelo reembolso. A diferença entre os tempos limite para cada salto é chamada de +cltv_expiry_delta+ e é definida por cada nó e divulgada para a rede, como veremos no <<gossip>>.
+
+Por exemplo, Alice define o tempo limite de reembolso no primeiro HTLC para uma altura de bloco de "atual + 500 blocos" ("atual" sendo a altura do bloco atual). Bob, então, define o tempo limite +cltv_expiry+ no HTLC para Chan como "atual + 450 blocos". Chan define o tempo limite como "atual + 400 blocos" a partir da altura do bloco atual. Dessa forma, Chan pode obter um reembolso no HTLC que ele ofereceu a Dina _antes_ de Bob obter um reembolso no HTLC que ele ofereceu a Chan. Bob pode obter um reembolso no HTLC que ele ofereceu a Chan antes que Alice possa obter um reembolso pelo HTLC que ela ofereceu a Bob. O decremento do tempo limite evita condições de corrida e garante que a cadeia de HTLC seja desfeita de trás para frente, do destino para a origem.(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc3")))(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc2")))
+
+=== Conclusão
+
+Neste capítulo, vimos como Alice pode pagar Dina mesmo que ela não tenha um canal de pagamento direto. Alice pode encontrar um caminho que a conecte a Dina e rotear um pagamento por vários canais de pagamento para que chegue a Dina.
+
+Para garantir que o pagamento seja atômico e sem confiança em vários saltos, Alice deve implementar um protocolo de justiça em cooperação com todos os nós intermediários no caminho. O protocolo de justiça é atualmente implementado como um HTLC, que compromete fundos a um hash de pagamento derivado de uma pré-imagem secreta de pagamento.
+
+Cada um dos participantes na rota de pagamento pode estender um HTLC para o próximo participante, sem se preocupar com roubo ou fundos retidos. O HTLC pode ser resgatado revelando a pré-imagem secreta do pagamento. Assim que um HTLC chega a Dina, ela revela a pré-imagem, que flui de volta, resolvendo todos os HTLCs oferecidos.
+
+Por fim, vimos como uma cláusula de reembolso bloqueada por tempo completa o HTLC, garantindo que cada participante possa obter um reembolso se o pagamento falhar, mas por qualquer motivo um dos participantes não cooperar na reversão dos HTLCs. Ao sempre ter a opção de ir para a blockchain para obter um reembolso, o HTLC alcança o objetivo de justiça de atomicidade e operação sem confiança.(((range="endofrange", startref="ix_08_routing_htlcs-asciidoc0")))

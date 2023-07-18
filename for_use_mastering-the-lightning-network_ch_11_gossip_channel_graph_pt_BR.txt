@@ -1,0 +1,488 @@
+[[gossip]]
+== Gossip e o Grafo de Canais
+
+((("channel graph", id="ix_11_gossip_channel_graph-asciidoc0", range="startofrange")))((("gossip protocol", id="ix_11_gossip_channel_graph-asciidoc1", range="startofrange")))Neste capítulo, descreveremos o protocolo de gossip da Lightning Network e como ele é usado pelos nós para construir e manter um grafo de canais. Também revisaremos o mecanismo de inicialização DNS usado para encontrar pares com os quais "conversar" por meio do gossip.
+
+A seção "Taxas de roteamento e retransmissão de gossip" é destacada por um esboço que abrange a camada de roteamento e a camada peer-to-peer na <<LN_protocol_gossip_highlight>>.
+
+[[LN_protocol_gossip_highlight]]
+.Protocolo de Fofoca (Gossip) no Conjunto de Protocolos Lightning
+image::images/mtln_1101.png["Gossip protocol in the Lightning protocol suite"]
+
+Como já aprendemos, a Lightning Network utiliza um protocolo de roteamento onion baseado em origem para entregar um pagamento do remetente ao destinatário.
+Para fazer isso, o nó remetente deve ser capaz de construir um caminho de canais de pagamento que o conecte ao destinatário, como veremos no <<path_finding>>.
+Portanto, o remetente deve ser capaz de mapear a Lightning Network construindo um grafo de canais.
+O _channel graph_ é o conjunto interconectado de canais anunciados publicamente e os nós que esses canais interligam.
+
+Como os canais são respaldados por uma transação de financiamento que ocorre na cadeia (on-chain), alguém poderia erroneamente acreditar que os nós da Lightning poderiam simplesmente extrair os canais existentes da blockchain do Bitcoin.
+No entanto, isso só é possível até certo ponto.
+((("P2WSH (Pay-to-Witness-Script-Hash)")))((("Pay-to-Witness-Script-Hash (P2WSH)")))As transações de financiamento são endereços Pay-to-Witness-Script-Hash (P2WSH), e a natureza do script (multisig 2-de-2) só será revelada quando a saída da transação de financiamento for gasta.
+Mesmo que a natureza do script seja conhecida, é importante lembrar que nem todos os scripts multisig 2-de-2 correspondem a canais de pagamento.
+
+Existem ainda mais razões pelas quais olhar para o blockchain do Bitcoin pode não ser útil.
+Por exemplo, na Lightning Network, as chaves do Bitcoin que são usadas para assinar são rotacionadas pelos nós para cada canal e atualização.
+Portanto, mesmo que pudéssemos detectar de forma confiável as transações de financiamento na blockchain do Bitcoin, não saberíamos quais dois nós da Lightning Network possuem aquele canal específico.
+
+A Lightning Network resolve esse problema implementando um protocolo _gossip_ (conversa, ou fofoca).
+Os protocolos de fofoca são típicos de redes peer-to-peer (P2P) e permitem que os nós compartilhem informações com toda a rede com apenas algumas conexões diretas com os pares.
+Os nós da Lightning estabelecem conexões peer-to-peer criptografadas entre si e compartilham (gossip) informações que receberam de outros pares.
+Assim que um nó deseja compartilhar alguma informação, por exemplo, sobre um novo canal criado, ele envia uma mensagem para todos os seus pares.
+Ao receber uma mensagem, um nó decide se a mensagem recebida é nova e, caso seja, encaminha a informação para seus pares.
+Dessa forma, se a rede peer-to-peer estiver bem conectada, todas as novas informações necessárias para o funcionamento da rede serão eventualmente propagadas para todos os outros pares.
+
+Obviamente, se um novo peer se juntar à rede pela primeira vez, ele precisa conhecer alguns outros peers na rede para poder se conectar a outros e participar da rede.
+
+Neste capítulo, vamos explorar exatamente _como_ os nós da Lightning descobrem uns aos outros, descobrem e atualizam seus status de nó e se comunicam entre si.
+
+Quando a maioria se refere à parte _rede_ da Lightning Network ou Rede Relâmpago, eles estão se referindo ao _grafo de canais_, que é uma estrutura de dados autenticada única _ancorada_ na blockchain base
+do Bitcoin. 
+
+No entanto, a Lightning Network também é uma rede peer-to-peer de nós que fazem gossip de informações sobre canais de pagamento e nós. Geralmente, para que dois pares mantenham um canal de pagamento, eles precisam se comunicar diretamente, o que significa que haverá uma conexão peer entre eles.
+Isso sugere que o grafo de canais é uma sub-rede da rede peer-to-peer.
+No entanto, isso não é verdade porque os canais de pagamento podem permanecer abertos mesmo se um ou ambos os pares ficarem temporariamente offline.
+
+Vamos revisitar alguns dos termos que utilizamos ao longo do livro, analisando especificamente o que eles significam em termos do grafo de canais e da rede peer-to-peer (see <<network_terminology>>).
+
+[[network_terminology]]
+.Terminologia das diferentes redes
+[options="header"]
+|===
+| Channel graph  |Peer-to-peer network
+|  channel | connection
+| open | connect
+| close | disconnect
+|  funding transaction | encrypted TCP/IP connection
+| send	|	transmit
+| payment |  message
+|===
+
+Como a Lightning Network é uma rede peer-to-peer, é necessário algum processo inicial de inicialização (bootstrapping) para que os pares se descubram. Neste capítulo, acompanharemos a história de um novo par conectando-se à rede pela primeira vez e examinaremos cada etapa do processo de inicialização, desde a descoberta inicial de pares até a sincronização e validação do grafo de canais.
+
+Como um passo inicial, nosso novo nó precisa de alguma forma _descobrir_ pelo menos _um_ par que já esteja conectado à rede e tenha um grafo de canais completo (como veremos mais adiante, não há uma versão canônica do grafo de canais). Utilizando um dos muitos protocolos de inicialização iniciais para encontrar esse primeiro par, depois que uma conexão é estabelecida, nosso novo
+par agora precisa _baixar_ e _validar_ o grafo de canais. Uma vez que o grafo de canais tenha sido totalmente validado, nosso novo par estará pronto para começar a abrir canais e enviar pagamentos na rede.
+
+Após a inicialização inicial, um nó na rede precisa continuar mantendo sua visão do grafo de canais por meio do processamento de novas atualizações de políticas de roteamento de canais, descoberta e validação de novos canais, remoção de canais que foram encerrados on-chain e, finalmente, poda de canais que não enviam um sinal (heartbeat) adequado a cada duas semanas. pass:[<span class="keep-together">mais ou menos</span>].
+
+Ao finalizar este capítulo, você entenderá um componente fundamental de
+uma Rede Relâmpago peer-to-peer: ou seja, como os pares se descobrem e mantêm uma cópia local (perspectiva) do grafo de canais. Vamos começar explorando a história de um novo nó que acabou de ser iniciado e precisa encontrar outros pares para se conectar na rede.(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc1")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc0")))
+
+[role="pagebreak-before less_space"]
+=== Descoberta de Pares
+
+((("gossip protocol","peer discovery", id="ix_11_gossip_channel_graph-asciidoc2", range="startofrange")))((("peer discovery", id="ix_11_gossip_channel_graph-asciidoc3", range="startofrange")))Nesta seção, vamos acompanhar um novo nó da Lightning que deseja ingressar na rede por meio de três etapas:
+
+. Descobrir um grupo de pares de inicialização (bootstrap peers)
+. Baixar e validar o grafo de canais
+. Iniciar o processo de manutenção contínua do próprio grafo de canal
+
+
+==== Inicialização P2P
+
+((("bootstrapping","P2P")))((("initial peer bootstrapping")))((("P2P bootstrapping")))((("peer discovery","P2P bootstrapping")))Antes de fazer qualquer outra coisa, nosso novo nó primeiro precisa descobrir um conjunto de pares que já façam parte da rede. Chamamos esse processo de inicialização de pares, e é algo que toda rede peer-to-peer precisa implementar corretamente para garantir uma rede robusta e saudável.
+
+A inicialização de novos pares em redes peer-to-peer existentes é um problema muito bem estudado, com várias soluções conhecidas, cada uma com suas próprias vantagens e desvantagens (trade-offs). A solução mais simples para esse problema é simplesmente empacotar um conjunto de pares de inicialização (bootstrap peers) _hardcoded_  (codificados) no software do nó P2P empacotado. Isso é simples no sentido de que cada novo nó tem uma lista de pares de inicialização no software em que estão executando, mas é bastante frágil, pois se o conjunto de pares de inicialização ficar offline, nenhum novo nó será capaz de ingressar na rede. Devido a essa fragilidade, essa
+opção geralmente é usada como um último recurso caso nenhum dos outros mecanismos de inicialização P2P funcione corretamente.
+
+((("initial peer discovery")))Em vez de codificar o conjunto de pares de inicialização dentro do próprio software/binário, podemos permitir que os pares obtenham dinamicamente um conjunto fresco/novo de pares de inicialização que eles possam usar para ingressar na rede. Chamaremos esse processo de _descoberta inicial de pares_. Normalmente, aproveitaremos
+protocolos de internet existentes para manter e distribuir um conjunto de pares de inicialização. Uma lista não exaustiva de protocolos que foram usados no passado para realizar a descoberta inicial de pares inclui:
+
+  * Domain Name Service (DNS)
+  * Internet Relay Chat (IRC)
+  * Hypertext Transfer Protocol (HTTP)
+
+Similar ao protocolo Bitcoin, o principal mecanismo de descoberta inicial de pares usado na Lightning Network ocorre por meio do DNS. Como a descoberta inicial de pares é uma tarefa crítica e universal para a rede, o processo foi _padronizado_ em https://github.com/lightningnetwork/lightning-rfc/blob/master/10-dns-bootstrap.md[BOLT #10: DNS Bootstrap].
+
+==== Inicialização DNS
+
+((("bootstrapping","DNS", id="ix_11_gossip_channel_graph-asciidoc4", range="startofrange")))((("DNS bootstrapping", id="ix_11_gossip_channel_graph-asciidoc5", range="startofrange")))((("peer discovery","DNS bootstrapping", id="ix_11_gossip_channel_graph-asciidoc6", range="startofrange")))O documento https://github.com/lightningnetwork/lightning-rfc/blob/master/10-dns-bootstrap.md[BOLT #10] descreve uma forma padrão de implementar a descoberta de pares
+usando o DNS. A inicialização baseada em DNS da Lightning utiliza até três tipos distintos de registros:
+
+* Registros +SRV+ para descobrir um conjunto de _chaves públicas de nós_.
+* Registros +A+ para mapear a chave pública de um nó para seu endereço +IPv4+ atual.
+* Registros +AAA+ para mapear a chave pública de um nó para seu endereço +IPv6+ atual.
+
+Aqueles que estão um pouco familiarizados com o protocolo DNS podem já estar familiarizados com os tipos de registro +A+ (nome para endereço IPv4) e +AAA+ (nome para endereço IPv6), mas não com o tipo +SRV+. O tipo de registro +SRV+ é usado por protocolos construídos sobre o DNS para determinar a _localização_ de um serviço específico. No nosso contexto, o serviço em questão é um nó Lightning, e a localização é o seu endereço IP. Precisamos usar esse tipo adicional de registro porque, ao contrário dos nós no protocolo Bitcoin, precisamos tanto de uma chave pública quanto de um endereço IP para nos conectar a um nó. Como veremos no <<wire_protocol>>, o protocolo de criptografia de transporte usado na Lightning Network requer o conhecimento da chave pública de um nó antes de estabelecer uma conexão, a fim de implementar o ocultamento de identidade para os nós na rede.
+
+===== Fluxo de trabalho de inicialização de um novo par
+
+Antes de mergulhar nos detalhes de https://github.com/lightningnetwork/lightning-rfc/blob/master/10-dns-bootstrap.md[BOLT #10], vamos primeiro delinear o fluxo de alto nível de um novo nó que deseja usar o BOLT #10 para entrar na rede.
+
+Primeiro, um nó precisa identificar um único servidor DNS ou um conjunto de servidores DNS que entendam o BOLT #10 para que possam ser usados para inicialização P2P.
+
+Embora o BOLT #10 use _lseed.bitcoinstats.com_ como servidor de seed, não existe um conjunto "oficial" de seeds DNS para esse fim. No entanto, cada uma das principais implementações mantém seu próprio seed DNS e eles fazem consultas cruzadas nos seeds umas das outras por motivos de redundância. Na <<dns_seeds>> você verá uma lista não exaustiva de alguns servidores de seed DNS populares.
+
+[[dns_seeds]]
+.Tabela de servidores de seed DNS do Lightning conhecidos
+[options="header"]
+|===
+| DNS server     | Maintainer
+| _lseed.bitcoinstats.com_ | Christian Decker
+| _nodes.lightning.directory_ | Lightning Labs (Olaoluwa Osuntokun)
+| _soa.nodes.lightning.directory_ | Lightning Labs (Olaoluwa Osuntokun)
+| _lseed.darosior.ninja_ | Antoine Poinsot
+|===
+
+
+As sementes (seeds) de DNS existem tanto para a rede principal quanto para a rede de teste do Bitcoin. Pelo bem
+de nosso exemplo, assumiremos a existência de uma semente de DNS BOLT #10 válida em _nodes.lightning.directory_.
+
+Em seguida, nosso novo nó emitirá uma consulta +SRV+ para obter um conjunto de _candidatos a pares de inicialização_. A resposta à nossa consulta será uma série de chaves públicas codificadas em bech32. Como o DNS é um protocolo baseado em texto, não podemos enviar dados binários brutos, portanto, é necessário um esquema de codificação. O BOLT #10 especifica uma codificação bech32 devido ao seu uso no ecossistema mais amplo do Bitcoin. O número de chaves públicas codificadas retornadas depende do servidor que responde à consulta, bem como de todos os resolvedores que estão entre o cliente e o servidor autoritativo.
+
+Usando a ferramenta de linha de comando amplamente disponível +dig+, podemos consultar a versão de _testnet_ da semente DNS mencionada anteriormente com o seguinte comando:
+
+----
+$ dig @8.8.8.8 test.nodes.lightning.directory SRV
+----
+
+Usamos o argumento +@+ para forçar a resolução via servidor de nomes do Google (com o endereço IP 8.8.8.8) porque ele não filtra grandes respostas de consultas +SRV+. No final do comando, especificamos que queremos apenas que registros +SRV+ sejam retornados. Uma resposta de exemplo se parece com <<ex1101>>.
+
+[[ex1101]]
+.Consultando a semente DNS para nós alcançáveis
+====
+----
+$ dig @8.8.8.8 test.nodes.lightning.directory SRV
+
+; <<>> DiG 9.10.6 <<>> @8.8.8.8 test.nodes.lightning.directory SRV
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 43610
+;; flags: qr rd ra; QUERY: 1, ANSWER: 25, AUTHORITY: 0, ADDITIONAL: 1
+
+;; QUESTION SECTION:
+;test.nodes.lightning.directory.	IN	SRV
+
+;; ANSWER SECTION:
+test.nodes.lightning.directory.	59 IN	SRV	10 10 9735 <1>
+ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7.test.nodes.lightning.directory. <2>
+test.nodes.lightning.directory.	59 IN	SRV	10 10 15735 ln1qtgsl3efj8verd4z27k44xu0a59kncvsarxatahm334exgnuvwhnz8dkhx8.test.nodes.lightning.directory.
+
+ [...]
+
+;; Query time: 89 msec
+;; SERVER: 8.8.8.8#53(8.8.8.8)
+;; WHEN: Thu Dec 31 16:41:07 PST 2020
+----
+<1> Número da porta TCP onde o nó LN pode ser alcançado. 
+<2> Chave pública do nó (ID) codificada como um nome de domínio virtual.
+====
+
+Nós truncamos a resposta por questões de brevidade e mostramos apenas duas das respostas retornadas. As respostas contêm um nome de domínio "virtual" para um nó de destino, e à esquerda temos a _porta TCP_ onde esse nó pode ser alcançado. A primeira resposta usa a porta TCP padrão para a Lightning Network: +9735+. A segunda resposta usa uma porta personalizada, o que é permitido pelo protocolo.
+
+A seguir, tentaremos obter o outro pedaço de informação de que precisamos para nos conectar a nós: o endereço IP dele. Antes de podermos fazer a consulta para isso, no entanto, primeiro faremos a _decodificação_ da codificação bech32 da chave pública a partir do nome de domínio virtual:
+
+----
+ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7
+----
+
+Decodificando esta string bech32, obtemos a seguinte
+chave pública válida +secp256k1+ :
+
+----
+026c64f5a7f24c6f7f0e1d6ec877f23b2f672fb48967c2545f227d70636395eaf3
+----
+
+Agora que temos a chave pública bruta, vamos pedir ao servidor DNS para _resolver_ o host virtual fornecido para que possamos obter as informações de IP (registro +A+) para o nó, como mostrado no <<ex1102>>.
+
+++++
+<div id="ex1102" data-type="example">
+<h5>Obtendo o endereço de IP mais recente para um nó</h5>
+
+<pre data-type="programlisting">$ dig ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7.test.nodes.lightning.directory A
+
+; &lt;&lt;&gt;&gt; DiG 9.10.6 &lt;&lt;&gt;&gt; ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7.test.nodes.lightning.directory A
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 41934
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7.test.nodes.lightning.directory. IN A
+
+;; ANSWER SECTION:
+ln1qfkxfad87fxx7lcwr4hvsalj8vhkwta539nuy4zlyf7hqcmrjh40xx5frs7.test.nodes.lightning.directory. 60 IN A <em>X.X.X.X</em> <a class="co" id="comarker1" href="#c01"><img src="callouts/1.png" alt="1"/></a>
+
+;; Query time: 83 msec
+;; SERVER: 2600:1700:6971:6dd0::1#53(2600:1700:6971:6dd0::1)
+;; WHEN: Thu Dec 31 16:59:22 PST 2020
+;; MSG SIZE  rcvd: 138</pre>
+
+<dl class="calloutlist">
+<dt><a class="co" id="c01" href="#comarker1"><img src="callouts/1.png" alt="1"/></a></dt>
+<dd>O servidor DNS retorna um endereço de IP <code><em>X.X.X.X</em></code>. Substituímos por X's aqui no texto para evitar apresentar um endereço IP real.</p></dd>
+</dl></div>
+++++
+
+No comando anterior, consultamos o servidor para obter um endereço IPv4 pass:[<span class="keep-together">(<code>Um</code> registro)</span>] de dendereço para nosso nó alvo (substituído por ++__X.X.X.X__++ no exemplo anterior). Agora que temos a chave pública bruta, o endereço IP e a porta TCP, podemos nos conectar ao protocolo de transporte do nó em:
+
+----
+026c64f5a7f24c6f7f0e1d6ec877f23b2f672fb48967c2545f227d70636395eaf3@X.X.X.X:9735
+----
+
+Consultar o registro DNS +A+ atual de um determinado nó também pode ser usado para procurar o conjunto _mais recente_ de endereços. Essas consultas podem ser usadas para sincronizar mais rapidamente as informações de endereço mais recentes de um nó, em comparação com a espera por atualizações de endereço na rede gossip (see <<node_announcement>>).
+
+Neste ponto de nossa jornada, nosso novo nó Lightning encontrou seu primeiro
+peer e estabeleceu sua primeira conexão! Agora podemos começar a segunda fase de inicialização de novos pares: sincronização e validação do grafo de canal.
+
+Primeiro, vamos explorar mais das complexidades do BOLT #10 em si para obter uma visão mais profunda de como as coisas funcionam por baixo dos panos.(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc6")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc5")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc4")))
+
+==== Opções de Consulta SRV
+
+O https://github.com/lightningnetwork/lightning-rfc/blob/master/10-dns-bootstrap.md[BOLT #10] o padrão é altamente extensível devido ao uso de subdomínios
+aninhados como uma camada de comunicação para opções de consulta adicionais. O
+protocolo de inicialização permite que os clientes especifiquem ainda mais o _tipo_ de nós que estão tentando consultar, em oposição ao padrão de receber um subconjunto aleatório de nós nas respostas da consulta.
+
+O esquema de subdomínio de opções de consulta usa uma série de pares chave-valor, em que a chave em si é uma _letra única_ e o conjunto restante de texto é o próprio valor.Os seguintes tipos de consulta existem na versão atual do https://github.com/lightningnetwork/lightning-rfc/blob/master/10-dns-bootstrap.md[BOLT #10] documento de padrões:
+
++r+:: O byte _realm_ (domínio) que é usado para determinar para qual cadeia ou domínio as consultas devem ser retornadas. Atualmente, o único valor para essa chave é +0+, que denota "Bitcoin".
+
++a+:: Permite que os clientes filtrem os nós retornados com base nos _tipos_ de endereços que eles anunciam. Por exemplo, isso pode ser usado para obter apenas nós que anunciam um endereço IPv6 válido. O valor que segue esse tipo é baseado em um campo de bits que _indexa_ o conjunto de _tipos_ de endereços específicos definidos em https://github.com/lightningnetwork/lightning-rfc/blob/master/07-routing-gossip.md[BOLT #7]. O valor padrão para esse campo é +6+, que representa tanto IPv4 quanto IPv6 (os bits 1 e 2 estão definidos).
+
++l+:: Uma chave pública de nó válida serializada em formato comprimido. Isso permite que um cliente faça uma consulta para um nó específico em vez de receber um conjunto de nós aleatórios.
+
++n+:: O número de registros a serem retornados. O valor padrão para esse campo é +25+.
+
+Um exemplo de consulta com opções de consulta adicionais se parece com o seguinte:
+
+----
+r0.a2.n10.nodes.lightning.directory
+----
+
+Analisando a consulta um par chave-valor de cada vez, obtemos os seguintes
+insights:
+
++r0+:: A consulta tem como alvo o domínio Bitcoin
++a2+:: A consulta deseja apenas que endereços IPv4 sejam retornados
++n10+:: Os pedidos de consulta
+
+Tente algumas combinações dos vários sinalizadores (flags) usando a ferramenta de linha de comando +dig+ do DNS por conta própria.(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc3")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc2"))):
+
+----
+dig @8.8.8.8 r0.a6.nodes.lightning.directory SRV
+----
+
+=== O Grafo de Canais
+
+((("channel graph","structure of")))Agora que nosso novo nó é capaz de usar o protocolo de inicialização DNS para se conectar ao seu primeiro par, ele pode começar a sincronizar o grafo de canais! No entanto, antes de sincronizarmos o grafo de canais, precisamos aprender exatamente _o que_ queremos dizer com grafo de canais. Nesta seção, exploraremos a _estrutura_ precisa do grafo de canais e examinaremos os aspectos únicos do grafo de canais em comparação com a estrutura de dados abstrata grafo típica, que é bem conhecida/usada no campo da ciência da computação.
+
+==== Um Grafo Direcionado
+
+((("channel graph","directed graph")))((("directed graph")))Um _grafo_ em ciência da computação é uma estrutura de dados especial composta por vértices (geralmente chamados de nós) e arestas (também conhecidas como conexões). Dois nós podem estar conectados por uma ou mais arestas. O grafo de canais também é _direcionado_, uma vez que um pagamento pode fluir em qualquer direção ao longo de uma aresta (um canal). Um exemplo de _grafo direcionado_ é mostrado em. <<directed_graph>>.
+
+[[directed_graph]]
+.Um grafo direcionado
+image::images/mtln_1102.png["A directed graph"]
+
+No contexto da Lightning Network, nossos vértices são os próprios nós da Lightning, sendo as arestas os canais de pagamento que conectam esses nós. Como estamos preocupados com o _roteamento de pagamentos_, em nosso modelo, um nó sem arestas (sem canais de pagamento) não é considerado parte do grafo, pois não é útil.
+
+Porque os canais em si são UTXOs (endereços multisig 2-de-2 financiados), podemos visualizar o grafo de canais como um subconjunto especial do conjunto de UTXOs do Bitcoin, sobre o qual podemos adicionar informações adicionais (os nós, etc.) para chegar à estrutura final sobreposta, que é o grafo de canais. Ancorar componentes fundamentais do grafo de canais
+na base da blockchain do Bitcoin significa que é impossível _falsificar_ um grafo de canais válido, o que tem propriedades úteis quando se trata de prevenção de spam, como veremos mais adiante.
+
+=== Mensagens do Protocolo Gossip
+
+((("channel graph","gossip protocol messages", id="ix_11_gossip_channel_graph-asciidoc7", range="startofrange")))((("gossip protocol","messages", id="ix_11_gossip_channel_graph-asciidoc8", range="startofrange")))As informações do grafo de canais são propagadas pela Lightning P2P Network por meio de três mensagens, que são descritas em https://github.com/lightningnetwork/lightning-rfc/blob/master/07-routing-gossip.md[BOLT #7]:
+
++node_announcement+:: O vértice em nosso grafo que comunica a chave pública de um nó, bem como como alcançar o nó pela internet e alguns metadados adicionais que descrevem o conjunto de _recursos_ que o nó suporta.
+
++channel_announcement+:: Uma prova ancorada na blockchain da existência de um canal entre dois nós individuais. Qualquer terceiro pode verificar essa prova para garantir que um canal _real_ esteja realmente sendo anunciado. Semelhante ao +node_announcement+, esta mensagem também contém informações que descrevem as _capacidades_ do canal, o que é útil ao tentar rotear um pagamento.
+
++channel_update+:: Um _par_ de estruturas que descreve o conjunto de políticas de roteamento para um determinado canal. As mensagens +channel_update+ vêm em um _pair_ porque um canal é uma borda direcionada, então cada lado do canal é capaz de especificar sua própria política de roteamento personalizada.
+
+É importante destacar que cada componente do grafo de canais é _autenticado_, permitindo que uma terceira parte verifique se o proprietário de um canal/atualização/nó é realmente aquele que está enviando uma atualização. Isso efetivamente torna o grafo de canais um tipo único de _estrutura de dados autenticada_ que não pode ser falsificada. Para autenticação, usamos uma assinatura digital ECDSA +secp256k1+ (ou uma série delas) sobre o resumo serializado da própria mensagem. Neste capítulo, não entraremos nos detalhes específicos da estruturação/serialização de mensagens usadas na Lightning Network, pois cobriremos essas informações no <<wire_protocol>>.
+
+Com a estrutura de alto nível do grafo de canais delineada, agora iremos nos aprofundar na estrutura precisa de cada uma das três mensagens usadas para divulgar (to gossip) o grafo de canais. Também explicaremos como é possível verificar cada mensagem e componente do grafo de canais.
+
+[[node_announcement]]
+==== A Mensagem node_announcement
+
+((("gossip protocol","node_announcement message", id="ix_11_gossip_channel_graph-asciidoc9", range="startofrange")))((("node_announcement message", id="ix_11_gossip_channel_graph-asciidoc10", range="startofrange")))Primeiro, temos a mensagem +node_announcement+, que serve a dois propósitos 
+primários:
+
+ 1. Para anunciar informações de conexão para que outros nós possam se conectar a um nó, seja para inicializar na rede ou para tentar estabelecer um novo canal de pagamento com esse nó.
+
+ 2. Para comunicar o conjunto de recursos (capacidades) de nível de protocolo que um nó entende/suporta. A negociação de recursos entre nós permite que os desenvolvedores adicionem novos recursos de forma independente e os suportem com qualquer outro nó de forma opcional.
+
+Ao contrário dos anúncios de canal, os anúncios de nó não são ancorados na
+base da blockchain. Portanto, os anúncios de nós são
+apenas considerados válidos se tiverem propagado com um anúncio de canal correspondente. Em outras palavras, sempre rejeitamos nós sem canais de pagamento para garantir que um par malicioso não possa inundar a rede com nós falsos que não fazem parte do grafo do canal.
+
+===== A estrutura da mensagem node_announcement
+
+((("node_announcement message","structure")))A +node_announcement+ é composta pelos
+seguintes campos:
+
+ +signature+:: Uma assinatura ECDSA válida que abrange o resumo serializado de todos os campos listados abaixo. Essa assinatura deve corresponder à chave pública do nó anunciado.
+
+ +features+:: Um vetor de bits que descreve o conjunto de características de protocolo que este nó entende. Abordaremos este campo com mais detalhes no <<feature_bits>> sobre a extensibilidade do protocolo Lightning. Em um nível mais alto, esse campo contém um conjunto de bits que representam os recursos que um nó entende. Como exemplo, um nó pode indicar que entende o tipo de canal mais recente.
+
++timestamp+:: Um carimbo de data e hora codificado em formato Unix epoch. Isso permite que os clientes executem uma ordenação parcial nas atualizações do anúncio de um nó.
+
++node_id+:: A chave pública +secp256k1+ a que este anúncio de nó pertence. Pode haver apenas um único +node_announcement+ para um determinado nó no grafo de canais em um determinado momento. Como resultado, um +node_announcement+ pode substituir um +node_announcement+ anterior para o mesmo nó se tiver um carimbo de data e hora mais alto (mais recente).
+
++rgb_color+:: Um campo que permite que um nó especifique uma cor RGB para ser associada a ele, frequentemente usado em visualizações de grafos de canais e diretórios de nós.
+
++alias+:: Uma sequência UTF-8 para servir como apelido de um determinado nó. Observe que esses apelidos não precisam ser globalmente únicos, nem são verificados de nenhuma forma. Portanto, eles não devem ser considerados como uma forma de identidade—pois podem ser facilmente falsificados.
+
++addresses+:: Um conjunto de endereços públicos alcançáveis pela internet que estão associados a um determinado nó. Na versão atual do protocolo, quatro tipos de endereço são suportados: IPv4 (tipo: 1), IPv6 (tipo: 2), Tor v2 (tipo: 3) e Tor v3 (tipo: 4). Na mensagem +node_announcement+, cada um desses tipos de endereço é representado por um tipo inteiro que é incluído entre parênteses após o tipo de endereço.
+
+===== Validando anúncios de nó
+
+((("node_announcement message","validating")))Validar um +node_announcement+ recebido é simples. As seguintes assertivas devem ser mantidas ao examinar um anúncio de nó:
+
+* Se um +node_announcement+ existente para esse nó já for conhecido, então o campo +timestamp+ de um novo +node_announcement+ recebido deve ser maior que o anterior.
+
+* Com essa restrição, impomos um nível forçado de "atualidade" 
+
+* Se nenhum +node_announcement+ existir para o nó fornecido, então um +channel_announcement+ existente que faça referência a determinado nó (mais sobre isso depois) já deve existir no grafo de canais local.
+
+* A +assinatura+ incluída deve ser uma assinatura ECDSA válida verificada usando a chave pública +node_id+ incluída e o resumo duplo-SHA-256 da codificação da mensagem bruta (sem a assinatura e o cabeçalho do quadro) como a mensagem.
+
+* Todos os +endereços+ incluídos devem ser classificados em ordem crescente com base em seu identificador de endereço.
+
+  * Os bytes incluídos em +alias+ devem ser uma sequência válida UTF-8.(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc10")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc9")))
+
+==== A Mensagem channel_announcement
+
+((("channel_announcement message", id="ix_11_gossip_channel_graph-asciidoc11", range="startofrange")))((("gossip protocol","channel_announcement message", id="ix_11_gossip_channel_graph-asciidoc12", range="startofrange")))Em seguida, temos a mensagem +channel_announcement+, que é usada para _anunciar_ um novo canal _público_ para a rede em geral. Observe que anunciar um canal é _opcional_. Um canal só precisa ser anunciado se for destinado a ser usado para roteamento pela Lightning Network. Nós de roteamento ativos podem optar por anunciar todos os seus canais. No entanto, certos nós, como nós móveis, provavelmente não têm a
+disponibilidade ou o desejo de serem nós de roteamento ativos. Como resultado, esses 
+nós móveis (que normalmente usam clientes leves para se conectar à rede P2P do Bitcoin) podem ter apenas canais _não anunciados_ (privados).
+
+======= Canais não anunciados (privados)
+
+((("channel_announcement message","unannounced (private) channels")))((("unannounced channels")))Um canal não anunciado não faz parte do conhecido grafo público de canais, mas ainda pode ser usado para enviar/receber pagamentos.  Um leitor atento pode estar se perguntando como um canal que não faz parte do grafo de canais público consegue receber pagamentos. A solução para esse problema é um conjunto de "assistentes de busca de caminho" que chamamos de dicas de roteamento.. Como veremos no <<invoices>>, faturas criadas por nós com canais não anunciados incluirão informações para ajudar o remetente a rotear para eles, desde que o nó tenha pelo menos um único canal com um nó de roteamento público existente.
+
+Devido à existência de canais não anunciados, o tamanho _real_ do grafo de canais (tanto os componentes públicos quanto privados) é desconhecido.
+
+===== Localizando um canal na blockchain do bitcoin
+
+((("blockchain","locating a channel on the Bitcoin blockchain")))((("channel_announcement message","locating a channel on the Bitcoin blockchain")))Como mencionado anteriormente, o grafo de canais é autenticado devido ao uso de criptografia de chave pública, bem como a blockchain do Bitcoin como um sistema de prevenção de spam. Para que um nó aceite um novo +channel_announcement+, o anúncio deve _provar_ que o canal realmente existe na blockchain do Bitcoin. Esse sistema de prova adiciona um custo inicial para adicionar uma nova entrada ao grafo de canais (as taxas on-chain que devem ser pagas para criar a UTXO do canal). Como resultado, mitigamos o spam e garantimos que um nó desonesto na rede não possa preencher a memória de um nó honesto sem custo com canais falsos.
+
+Dado que precisamos construir uma prova da existência de um canal, uma
+pergunta natural que surge é: como "apontar a" ou referenciar um determinado canal para o verificador? Dado que um canal de pagamento está ancorado em uma saída de transação não gasta (veja <<utxo>>), um pensamento inicial pode ser tentar anunciar o outpoint completo (+txid:index+) do canal. Dado que o outpoint é globalmente único e confirmado na cadeia, isso parece ser uma boa ideia; no entanto, isso tem uma desvantagem: o verificador deve manter uma cópia completa do conjunto de UTXOs para verificar os canais. Isso funciona bem para nós completos do Bitcoin, mas clientes que dependem de verificação leve geralmente não mantêm um conjunto completo de UTXOs. Como queremos garantir que possamos suportar nós móveis na Lightning Network, somos forçados a encontrar outra solução.
+
+E se, em vez de referenciar um canal pelo seu UTXO, o referenciássemos com base em sua "localização" na cadeia? Para fazer isso, precisamos de um esquema que nos permita referenciar um determinado bloco, em seguida, uma transação dentro desse bloco e, finalmente, uma saída específica criada por essa transação. Um identificador desse tipo é descrito em https://github.com/lightningnetwork/lightning-rfc/blob/master/07-routing-gossip.md[BOLT #7] e é conhecido como um _short channel ID_, ou +scid+.
+O +scid+ é usado no +channel_announcement+ (e no +channel_update+), bem como no pacote de roteamento criptografado por cebola incluído nos HTLCs, como aprendemos no <<onion_routing>>.
+
+[[short_channel_id]]
+[[scid]]
+===== O ID curto do canal
+
+((("blockchain","short channel ID")))Com base nas informações anteriores, temos três informações que precisamos codificar para referenciar de forma única um determinado canal. Como queremos uma representação compacta, vamos tentar codificar as informações em um _único_ número inteiro. Nosso formato de inteiro escolhido é um inteiro de 64 bits unsigned composto por 8 bytes.
+
+Primeiro, a altura do bloco. Usando 3 bytes (24 bits), podemos codificar 16.777.216 blocos. Isso deixa 5 bytes para codificar, respectivamente, o índice da transação e o índice da saída. Vamos usar os próximos 3
+bytes para codificar o índice da transação _dentro_ de um bloco. Isso é mais do que suficiente, dado que é possível ter apenas dezenas de milhares de transações em um bloco com os tamanhos de bloco atuais. Isso deixa 2 bytes para codificar o índice da saída do canal dentro da transação.
+
+Nosso formato +scid+ final se assemelha a:
+----
+block_height (3 bytes) || transaction_index (3 bytes) || output_index (2 bytes)
+----
+
+Usando técnicas de compactação de bits, primeiro codificamos os 3 bytes mais significativos como a altura do bloco, os próximos 3 bytes como o índice da transação e os 2 bytes menos significativos como o índice da saída que cria a UTXO do canal.
+
+Um ID curto de canal pode ser representado como um único número inteiro
+(+695313561322258433+) ou como uma sequência mais amigável para humanos: +632384x1568x1+. Aqui vemos que o canal foi minerado no bloco +632384+, foi a ++1568++ transação no bloco, e a saída do canal é a segunda (as UTXOs são indexadas a partir de zero) saída produzida pela transação.
+
+Agora que somos capazes de apontar de forma sucinta para uma determinada saída de financiamento de canal na cadeia, podemos examinar a estrutura completa da mensagem +channel_announcement+, bem como ver como verificar a prova de existência incluída na mensagem.
+
+===== A estrutura da mensagem channel_announcement
+
+((("channel_announcement message","message structure")))Um +channel_announcement+ comunica principalmente duas coisas:
+
+ 1. Uma prova de que existe um canal entre o nó A e o nó B, com ambos os nós controlando as chaves de multisig naquela saída de canal.
+
+ 2. O conjunto de capacidades do canal (quais tipos de HTLCs ele pode rotear, etc.).
+
+Ao descrever a prova, geralmente nos referimos ao nó +1+ e ao nó +2+. Dos dois nós conectados por um canal, o "primeiro" nó é aquele que possui uma codificação de chave pública "menor" quando comparamos as chaves públicas dos dois nós em formato comprimido hex codificado na ordem lexicográfica. Correspondentemente, além de uma chave pública do nó na rede, cada nó também deve controlar uma chave pública dentro da blockchain do Bitcoin.
+
+Semelhante à mensagem +node_announcement+, todas as assinaturas incluídas na mensagem +channel_announcement+ devem ser assinadas/verificadas em relação à codificação bruta da mensagem (sem o cabeçalho) que segue _após_ a assinatura final (porque não é possível para uma assinatura digital assinar a si mesma).
+
+Dito isso, uma mensagem +channel_announcement+ possui os seguintes campos:
+
++node_signature_1+:: A assinatura do primeiro nó no resumo da mensagem.
+
++node_signature_2+:: A assinatura do segundo nó sobre o resumo da mensagem.
+
++bitcoin_signature_1+:: A assinatura da chave multisig (na saída de financiamento) do primeiro nó sobre o resumo da mensagem.
+
++bitcoin_signature_2+:: A assinatura da chave multisig (na saída de financiamento) do segundo nó sobre o resumo da mensagem.
+
++features+:: Um vetor de bit de recurso que descreve o conjunto de recursos de nível de protocolo suportados por este canal.
+
++chain_hash+:: Um hash de 32 bytes que normalmente é o hash do bloco de gênese da blockchain (por exemplo, rede principal do Bitcoin) na qual o canal foi aberto.
+
++short_channel_id+:: O +scid+ que localiza exclusivamente a saída de financiamento do canal dentro da blockchain.
+
++node_id_1+:: A chave pública do primeiro nó na rede.
+
++node_id_2+:: A chave pública do segundo nó na rede.
+
++bitcoin_key_1+:: A chave multisig bruta para a saída de financiamento do canal para o primeiro nó na rede.
+
++bitcoin_key_2+:: A chave multisig bruta para a saída de financiamento do canal para o segundo nó na rede.
+
+===== Validação do anúncio do canal
+
+((("channel_announcement message","validation")))Agora que sabemos o que um +channel_announcement+ contém, podemos ver como verificar a existência do canal on-chain.
+
+Armado com as informações no +channel_announcement+, qualquer nó do Lightning (mesmo aquele sem uma cópia completa da blockchain do Bitcoin) pode verificar a existência e autenticidade do canal de pagamento.
+
+Primeiro, o verificador usará o ID curto de canal (short channel ID) para encontrar qual bloco do Bitcoin contém a saída de financiamento do canal. Com as informações da altura do bloco, o verificador pode solicitar apenas esse bloco específico de um nó do Bitcoin. O bloco pode então ser vinculado de volta ao bloco de gênese seguindo a cadeia de cabeçalhos de bloco para trás (verificando a prova de trabalho), confirmando que este é de fato um bloco pertencente ao blockchain do Bitcoin.
+
+Em seguida, o verificador usa o número de índice da transação para identificar o ID da transação que contém o canal de pagamento. A maioria das bibliotecas modernas do Bitcoin permite indexar a transação de um bloco com base no índice da transação dentro do bloco maior.
+
+Em seguida, o verificador usa uma biblioteca do Bitcoin (na linguagem do verificador) para extrair a transação relevante de acordo com seu índice dentro do bloco. O verificador irá validar a transação (verificando se ela está devidamente assinada e produz o mesmo ID de transação quando hasheada).
+
+Em seguida, o verificador irá extrair a saída Pay-to-Witness-Script-Hash (P2WSH) referenciada pelo número de índice de saída do ID curto de canal. Este é o endereço da saída de financiamento do canal. Além disso, o verificador irá garantir que o tamanho do canal alegado corresponda ao valor da saída produzida no índice de saída especificado.
+
+Por fim, o verificador irá reconstruir o script multisig a partir de +bitcoin_key_1+ e +bitcoin_key_2+ e confirmar que ele produz o mesmo endereço quanto na saída.
+
+O verificador agora verificou independentemente que o canal de pagamento no anúncio está financiado e confirmado no blockchain do Bitcoin!(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc12")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc11")))
+
+==== A Mensagem channel_update
+
+((("channel_update message")))((("gossip protocol","channel_update message")))A terceira e última mensagem usada no protocolo de gossip é a mensagem +channel_update+. Duas dessas mensagens são geradas para cada canal de pagamento (uma por cada parceiro do canal) anunciando suas taxas de roteamento, expectativas de tempo de bloqueio e capacidades.
+
+A mensagem +channel_update+ também contém um carimbo de data e hora, permitindo que um nó atualize suas taxas de roteamento e outras expectativas e capacidades ao enviar uma nova mensagem +channel_update+ com um carimbo de data e hora mais recente que substitui quaisquer atualizações mais antigas.
+
+A mensagem +channel_update+ contém os seguintes campos:
+
+
++signature+:: Uma assinatura digital correspondente à chave pública do nó, para autenticar a fonte e a integridade da atualização do canal
+
++chain_hash+:: O hash do bloco de gênese da cadeia que contém o canal
+
++short_channel_id+:: O ID curto do canal para identificar o canal
+
++timestamp+:: O carimbo de data e hora desta atualização, para permitir que os destinatários sequenciem as atualizações e substituam as atualizações mais antigas
+
++message_flags+:: Um campo de bit indicando a presença de campos adicionais na mensagem +channel_update+
+
++channel_flags+:: Um campo de bit mostrando a direção do canal e outras opções de canal
+
++cltv_expiry_delta+:: A expectativa delta de bloqueio de tempo (timelock) deste nó para o roteamento (veja <<onion_routing>>)
+
++htlc_minimum_msat+:: A quantidade mínima de HTLC que será roteada
+
++fee_base_msat+:: A taxa básica que será cobrada pelo roteamento
+
++fee_proportional_millionths+:: A taxa de tarifa proporcional que será cobrada pelo roteamento
+
++htlc_maximum_msat+ (+option_channel_htlc_max+):: O valor máximo que será roteado.
+
+Um nó que recebe a mensagem +channel_update+ pode anexar esses metadados à aresta do grafo de canais para permitir a busca de caminho (pathfinding), como veremos no <<path_finding>>.(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc8")))(((range="endofrange", startref="ix_11_gossip_channel_graph-asciidoc7")))
+
+=== Manutenção Contínua do Grafo de Canais
+
+((("channel graph","ongoing maintenance")))A construção de um grafo de canais não é um evento único, mas sim uma atividade contínua. Conforme um nó é iniciado na rede, ele começará a receber "gossip" na forma das três mensagens de atualização. Ele usará essas mensagens para imediatamente começar a construir um grafo de canais validado.
+
+Quanto mais informações um nó recebe, melhor se torna seu "mapa" da Lightning Network e mais eficiente ele pode ser em encontrar caminhos e entregar pagamentos.
+
+Um nó não apenas adiciona informações ao grafo de canais, mas também acompanha a última vez em que um canal foi atualizado e exclui canais "antigos" que não foram atualizados há mais de duas semanas. Além disso, se um nó perceber que outro nó não possui mais canais, ele também o removerá do grafo.
+
+As informações coletadas pelo protocolo de gossip não são as únicas informações que podem ser armazenadas no grafo do canal. Diferentes implementações de nós Relâmpago podem adicionar outros metadados aos nós e canais. Por exemplo, algumas implementações de nós calculam uma "pontuação" que avalia a "qualidade" de um nó como um par de roteamento. Essa pontuação é usada como parte do processo de busca de caminho para priorizar ou despriorizar rotas.
+
+=== Conclusão
+Neste capítulo, aprendemos como os nós Relâmpago descobrem uns aos
+outros, descobrem e atualizam o status de seus nós, e se comunicam entre si. Aprendemos como os grafos de canais são criados e mantidos, e exploramos algumas maneiras pelas quais a Rede Relâmpago desencoraja atores mal-intencionados ou nós desonestos de enviar spam na rede.

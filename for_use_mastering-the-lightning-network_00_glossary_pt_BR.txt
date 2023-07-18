@@ -1,0 +1,461 @@
+[glossary]
+[[glossary]]
+== Glossário
+
+Este glossário rápido contém muitos dos termos usados em relação ao Bitcoin e à Lightning Network. Esses termos são usados ao longo do livro, portanto, marque-os como uma referência rápida.
+
+endereço::
+    Endereços de Bitcoin codificam de forma compacta as informações necessárias para pagar um receptor. Um endereço moderno consiste em uma sequência de letras e números que começa com bc1 e se parece com +bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4+. Um endereço é uma forma abreviada para o script de bloqueio (locking script) do receptor, que pode ser usado por um remetente para transferir fundos para o receptor. A maioria dos endereços representa a chave pública do receptor ou algum tipo de script que define condições de gastos mais complexas. O exemplo anterior é um endereço bech32 que codifica um programa de testemunha bloqueando fundos no hash de uma chave pública (Veja _Pay-to-Witness-Public-Key-Hash_). Também existem formatos de endereços mais antigos que começam com 1 ou 3 e usam a codificação de endereço Base58Check para representar hashes de chaves públicas ou hashes de scripts.
+
+
+sistema criptográfico assimétrico::
+    Criptografia assimétrica, ou criptografia de chave pública, é um sistema criptográfico que utiliza pares de chaves: chaves públicas que podem ser amplamente divulgadas e chaves privadas que são conhecidas apenas pelo proprietário.
+    A geração de tais chaves depende de algoritmos criptográficos baseados em problemas matemáticos para produzir funções que são fáceis de resolver em uma direção, mas muito difíceis de resolver na direção oposta.
+    A segurança efetiva requer apenas manter a chave privada em sigilo; a chave pública pode ser distribuída abertamente sem comprometer a segurança.
+
+piloto automático::
+    Um piloto automático é um mecanismo de recomendação para nós (nodes) Lightning que utiliza estatísticas da topologia da Lightning Network para sugerir com quais nós eles devem abrir canais.
+    Dependendo da implementação do piloto automático, a capacidade do canal também pode ser recomendada.
+    Um piloto automático não faz parte do protocolo LN.
+
+saldo::
+    O saldo de um canal de pagamento é a quantidade de bitcoin que pertence a cada parceiro do canal.
+    Por exemplo, Alice pode abrir um canal com Bob no valor de 1 BTC.
+    O saldo do canal seria então de 1 BTC para Alice e 0 BTC para Bob.
+    À medida que os usuários realizam transações, o saldo do canal é atualizado.
+    Por exemplo, se Alice envia 0,2 BTC para Bob, o saldo agora é 0,8 BTC para Alice e 0,2 para Bob.
+    Quando o canal é fechado, os bitcoins no canal são divididos entre os dois parceiros do canal de acordo com o saldo mais recente codificado na transação de compromisso (commitment transaction).
+    Na Rede Lightning, a capacidade de enviar e receber pagamentos é limitada pelos saldos dos canais.
+Consulte _capacidade_.
+
+bech32::
+    Bech32 se refere a um formato genérico codificado em base32 com verificação de checksum, oferecendo garantias fortes de detecção de erros. Embora o Bech32 tenha sido originalmente desenvolvido para ser usado como formato de endereço para saídas nativas do SegWit (BIP-173), ele também é utilizado para codificar faturas (invoices) do Lightning Network (BOLT #11). Enquanto as saídas nativas do SegWit versão 0 (P2WPKH e P2WSH) utilizam o Bech32, versões superiores de saídas nativas do SegWit (como Pay-to-Taproot ou P2TR) utilizam a variante aprimorada chamada bech32m (BIP-350). Os endereços bech32m são às vezes chamados de "endereços bc1", refletindo o prefixo desses endereços. As saídas nativas do SegWit são mais eficientes em termos de espaço de bloco em comparação aos endereços mais antigos, podendo, assim, reduzir as taxas de transação para o proprietário de um endereço desse tipo.
+
+Bitcoin Improvement Proposal (BIP)::
+    Um BIP (Bitcoin Improvement Proposal) é uma proposta apresentada por membros da comunidade Bitcoin para melhorar o Bitcoin. Por exemplo, o BIP-21 é uma proposta para melhorar o esquema de identificador uniforme de recursos (URI) do Bitcoin. Os BIPs podem ser encontrados em https://github.com/bitcoin/bips[GitHub].
+
+bitcoin, Bitcoin::
+    Dependendo do contexto, "bitcoin" pode se referir ao nome da unidade de moeda (a criptomoeda em si), à rede ou ao protocolo subjacente. Escrito como "bitcoin" com "b" minúsculo geralmente se refere à unidade de moeda. Já "Bitcoin" com "B" maiúsculo geralmente se refere ao protocolo ou sistema.
+
+mineração de Bitcoin::
+    A mineração de Bitcoin é o processo de construir um bloco a partir de transações recentes de Bitcoin e, em seguida, resolver um problema computacional necessário como prova de trabalho.
+    É o processo pelo qual o registro compartilhado de bitcoins (ou seja, a blockchain do Bitcoin) é atualizada e novas transações são incluídas no registro.
+    É também o processo pelo qual novos bitcoins são emitidos.
+    Sempre que um novo bloco é criado, o nó de mineração recebe novos bitcoins criados dentro da transação coinbase desse bloco.
+
+bloco::
+    Um bloco é uma estrutura de dados na blockchain do Bitcoin que consiste em um cabeçalho e um corpo de transações de Bitcoin.
+    O bloco é marcado com um carimbo de data e hora e se refere a um bloco predecessor (pai) específico.
+    Quando é aplicada a função de hash ao cabeçalho do bloco, ele fornece a prova de trabalho que torna a blockchain probabilisticamente imutável.
+    Os blocos devem obedecer às regras impostas pelo consenso da rede para estender a blockchain.
+    Quando um bloco é anexado à blockchain, as transações incluídas são consideradas como tendo sua primeira confirmação.
+
+blockchain::
+    A blockchain é um registro distribuído, ou banco de dados, de todas as transações Bitcoin.
+    As transações são agrupadas em atualizações discretas chamadas de blocos, limitados a 4 milhões de unidades de peso.
+    Os blocos são produzidos aproximadamente a cada 10 minutos por meio de um processo estocástico chamado mineração.
+    Cada bloco inclui uma "prova de trabalho" computacionalmente intensiva.
+    O requisito de prova de trabalho é usado para regular os intervalos de bloco e proteger a blockchain contra ataques que visam reescrever o histórico:
+    um atacante precisaria superar a prova de trabalho existente para substituir os blocos já publicados, tornando cada bloco probabilisticamente imutável à medida que é "enterrado" sob blocos subsequentes.
+
+BOLT::
+    A BOLT—Basis Of Lightning Technology ou Base da Tecnologia Lightning—é a especificação formal da Lightning Network. Ao contrário do Bitcoin, que possui uma implementação de referência que também serve como especificação do protocolo, as várias implementações da LN seguem o BOLT para que possam funcionar entre si e formar a mesma rede. Ele está disponível em https://github.com/lightningnetwork/lightning-rfc[GitHub].
+
+capacidade::
+    A capacidade de um canal de pagamento é equivalente à quantidade de bitcoin fornecida pela transação de financiamento (funding transaction).
+    Devido à visibilidade pública da transação de financiamento na blockchain e ao anúncio do canal por meio do protocolo de divulgação (gossip protocol), a capacidade do canal é uma informação pública.
+    Isso não revela nenhuma informação sobre quanto bitcoin cada um dos parceiros do canal possui no canal, ou seja, o saldo.
+    Uma alta capacidade não garante que o canal possa ser usado para roteamento em ambos os pass:[ <span class="keep-together">sentidos</span> ].
+
+c-lightning::
+    Implementação do protocolo LN pela empresa baseada em Victoria https://blockstream.com[Blockstream]. Está escrito em C. O código-fonte está em https://github.com/ElementsProject/lightning[GitHub].
+
+closing transaction::
+    Se ambos os parceiros do canal concordarem em fechar um canal, eles criarão uma transação de liquidação que reflete a transação de compromisso mais recente.
+Após a troca de assinaturas para uma transação de fechamento, nenhuma atualização adicional do canal deve ser feita.
+    O fechamento mútuo de um canal com a ajuda de uma transação de fechamento tem a vantagem de que menos transações de blockchain são necessárias para reivindicar todos os fundos, em comparação com forçar unilateralmente o fechamento de um canal publicando uma transação de compromisso. Além disso, os fundos para ambas as partes podem ser gastos imediatamente após o fechamento da transação.
+
+CLTV::
+    CLTV é uma sigla para o operador de Script do Bitcoin OP_CHECKLOCKTIMEVERIFY. Isso define um bloco de altura absoluta antes que uma saída possa ser gasta. A atomicidade do processo de roteamento depende muito dos valores CLTV em HTLCs. Os nós de roteamento anunciam, por meio do protocolo de divulgação (gossip protocol), seus deltas de expiração CLTV esperados para quaisquer HTLCs de entrada e saída.
+
+coinbase::
+    A coinbase é um campo especial permitido apenas na única entrada de transações coinbase.
+    A coinbase permite até 100 bytes de dados arbitrários, mas desde o BIP-34, deve primeiro apresentar a altura do bloco atual para garantir que as transações coinbase sejam únicas.
+Não deve ser confundido com transação coinbase.
+
+transação coinbase::
+    A primeira transação em um bloco que é sempre criada por um minerador e inclui uma única coinbase.
+    A transação coinbase pode reivindicar a recompensa do bloco e atribuí-la a uma ou mais saídas.
+     A recompensa do bloco consiste no subsídio do bloco (bitcoin recém-criado) e na soma de todas as taxas de transação das transações incluídas no bloco.
+    As saídas coinbase só podem ser gastas após amadurecerem por 100 blocos.
+     Se o bloco incluir alguma transação SegWit, a transação coinbase deve incluir um compromisso com os identificadores de transação testemunha (witness transaction identifiers) em uma saída adicional.
+
+cold storage::
+    Refere-se a manter uma quantidade de bitcoin offline. O armazenamento a frio (cold storage) é alcançado quando as chaves privadas do Bitcoin são criadas e armazenadas em um ambiente seguro e offline. O armazenamento a frio é importante para proteger os bitcoins. Computadores online estão vulneráveis a hackers e não devem ser usados para armazenar uma quantidade significativa de bitcoins.
+
+commitment transaction::
+    Uma transação de compromisso é uma transação Bitcoin, assinada por ambos os parceiros de canal, que codifica o saldo mais recente de um canal.
+    Sempre que um novo pagamento for feito ou encaminhado pelo canal, o saldo do canal será atualizado e uma nova transação de compromisso será assinada por ambas as partes.
+    É importante ressaltar que em um canal entre Alice e Bob, tanto Alice quanto Bob mantêm sua própria versão da transação de compromisso (commitment transaction), que também é assinada pela outra parte.
+A qualquer momento, o pass:[ <span class="keep-together">canal</span> ] pode ser fechado por Alice ou Bob se eles enviarem sua transação de compromisso para a blockchain do Bitcoin.
+    O envio de uma transação de compromisso mais antiga (desatualizada) é considerado uma "trapaça" (ou seja, uma violação do protocolo) na Rede Lightning e pode ser penalizado pela outra parte, que pode reivindicar todos os fundos do canal para si por meio de uma transação de penalidade (penalty transaction).
+
+confirmações::
+    Assim que uma transação é incluída em um bloco, ela possui uma confirmação. Assim que o próximo bloco é minerado na blockchain, a transação possui duas confirmações, e assim por diante. Seis ou mais confirmações são consideradas provas suficientes de que uma transação não pode ser revertida.
+
+contrato::
+     Um contrato é um conjunto de transações Bitcoin que juntas resultam em um determinado comportamento desejado.
+    Exemplos são RSMCs (Revocable Sequence Maturity Contracts) para criar um canal de pagamento bidirecional sem confiança, ou HTLCs (Hashed Time-Locked Contracts) para criar um mecanismo que permite o encaminhamento de pagamentos sem confiança por meio de terceiros.
+
+Diffie–Hellman Key Exchange (DHKE)::
+Na Rede Lightning, o método Elliptic Curve Diffie-Hellman (ECDH) é usado.
+     É um protocolo de acordo de chave anônimo que permite que duas partes, cada uma tendo um par de chaves pública-privada de curva elíptica, estabeleçam um segredo compartilhado por meio de um canal de comunicação inseguro.
+    Esse segredo compartilhado pode ser usado diretamente como uma chave ou para derivar outra chave.
+    A chave, ou a chave derivada, pode então ser usada para criptografar comunicações subsequentes usando uma cifra de chave simétrica.
+    Um exemplo de chave derivada seria o segredo compartilhado entre a chave de sessão efêmera de um remetente de uma cebola com a chave pública do nó de um salto da cebola, conforme descrito e usado pelo SPHINX Mix Format.
+
+assinatura digital::
+    Uma assinatura digital é um esquema matemático para verificar a autenticidade e integridade de mensagens ou documentos digitais.
+    Pode ser visto como um compromisso criptográfico em que a mensagem não está oculta.
+
+gasto duplo::
+    O gasto duplo é o resultado de gastar algum dinheiro com sucesso mais de uma vez.
+    Bitcoin protege contra gastos duplos, verificando se cada transação adicionada à blockchain adere às regras de consenso; isso significa verificar se os insumos para a transação não foram gastos anteriormente.
+
+Elliptic Curve Digital Signature Algorithm (ECDSA)::
+    O Algoritmo de Assinatura Digital de Curva Elíptica ou ECDSA (Elliptic Curve Digital Signature Algorithm) é um algoritmo criptográfico usado pelo Bitcoin para garantir que os fundos só possam ser gastos pelo detentor da chave privada correta.
+
+Eclair::
+    Implementação do Protocolo LN pela empresa com sede em Paris https://acinq.co[ACINQ]. Está escrito em Scala. O código-fonte está em https://github.com/ACINQ/eclair[GitHub].
+
+encoding::
+    Codificação é o processo de converter uma mensagem em uma forma diferente. Por exemplo, converter um número de decimal para hexadecimal.
+
+servidor Electrum::
+    Um servidor Electrum é um nó Bitcoin com uma interface adicional (API). Ele é frequentemente necessário por carteiras de Bitcoin que não executam um nó completo (full node). Por exemplo, essas carteiras verificam o status de transações específicas ou transmitem transações para o mempool usando as APIs do servidor Electrum. Algumas carteiras (wallets) da Rede Lightning também utilizam servidores Electrum.
+
+chave efêmera::
+    Chaves efêmeras são chaves que são usadas apenas por um curto período de tempo e não são mantidas após o uso. Elas são frequentemente derivadas para uso em uma sessão a partir de outra chave que é retida a longo prazo. As chaves efêmeras são principalmente usadas dentro do formato SPHINX Mix e no roteamento de cebolas (onion routing) na Lightning Network.
+Isso aumenta a segurança das mensagens ou pagamentos transportados.
+    Mesmo que uma chave efêmera vaze, apenas as informações sobre uma única sessão se tornam públicas.
+
+feature bits::
+    Uma string binária que os nós da Lightning usam para comunicar entre si quais recursos são compatíveis.
+    Bits de recurso (feature bits) são incluídos em muitas mensagens da Lightning Network, bem como no BOLT #11.
+     Eles podem ser decodificados usando o BOLT #9 e informarão aos nós quais recursos o nó habilitou e se eles são compatíveis com versões anteriores.
+    Também conhecidos como "flags" de recursos.
+
+taxas::
+    No contexto da Rede Lightning, os nós cobrarão taxas de roteamento para encaminhar os pagamentos de outros usuários.
+    Os nós individuais podem definir suas próprias políticas de taxas, que serão calculadas como a soma de uma taxa fixa (+base_fee+) e uma taxa de juros (+fee_rate+) que depende do valor do pagamento.
+    No contexto do Bitcoin, o remetente de uma transação paga uma taxa de transação aos mineradores para incluir a transação em um bloco.
+    As taxas de transação do Bitcoin não incluem uma taxa base e dependem linearmente do peso da transação, mas não do valor da transação.
+
+funding transaction::
+    A transação de financiamento é usada para abrir um canal de pagamento. O valor (em bitcoin) da transação de financiamento é exatamente a capacidade do canal de pagamento.
+    A saída da transação de financiamento é um script de múltiplas assinaturas (multisig) 2-de-2, onde cada parceiro do canal controla uma chave. Devido à sua natureza de multisig, ela só pode ser gasta por acordo mútuo entre os parceiros do canal.
+    Eventualmente, será gasta por uma das transações de compromisso ou pela transação de fechamento.
+
+características globais (+globalfeatures+ field)::
+    As características globais de um nó da Lightning Network são as características de interesse para todos os outros nós.
+    Mais comumente, eles estão relacionados a formatos de roteamento suportados.
+    Elas são anunciadas na mensagem `init` do protocolo de pares (peer protocol), bem como nas mensagens `channel_announcement` e `node_announcement` do protocolo de divulgação (gossip protocol).
+
+protocolo gossip::
+    Os nós da Lightning Network enviam e recebem informações sobre a topologia da rede Lightning por meio de mensagens de divulgação (gossip messages) que são trocadas com seus pares.
+    O protocolo de divulgação (gossip protocol) é principalmente definido no BOLT #7 e define o formato das mensagens `node_announcement`, `channel_announcement` e `channel_update`.
+    Para evitar spam, as mensagens de anúncio de nó só serão encaminhadas se o nó já tiver um canal, e as mensagens de anúncio de canal só serão encaminhadas se a transação de financiamento do canal tiver sido confirmada pela rede Bitcoin.
+    Normalmente, os nós da Lightning Network se conectam aos seus parceiros de canal, mas também é possível se conectar a qualquer outro nó da Lightning para processar as mensagens de divulgação (gossip messages).
+
+hardware wallet::
+    Uma carteira de hardware é um tipo especial de carteira Bitcoin que armazena as chaves privadas do usuário em um dispositivo de hardware seguro.
+    No momento em que escrevemos o livro, as carteiras de hardware não estão disponíveis para os nós da LN porque as chaves usadas pela Lightning precisam estar online para participar do protocolo.
+
+hash::
+    Uma impressão digital de tamanho fixo de alguma entrada binária de comprimento arbitrário. Também conhecido como _digest_.
+
+hash-based message authentication code (HMAC)::
+    O HMAC (Hash-based Message Authentication Code) é um algoritmo para verificar a integridade e autenticidade de uma mensagem com base em uma função de hash e uma chave criptográfica.
+    Ele é usado no roteamento de cebola (onio routing) para garantir a integridade de um pacote em cada salto, bem como na variante do protocolo de ruído (Noise Protocol) usado para criptografia de mensagens.
+
+função hash::
+    Uma função hash criptográfica é um algoritmo matemático que mapeia dados de tamanho arbitrário para uma sequência de bits de tamanho fixo (um hash) e é projetada para ser uma função unidirecional, ou seja, uma função que é inviável de ser invertida.
+    A única maneira de recriar os dados de entrada a partir da saída de uma função hash criptográfica ideal é tentar uma busca de força bruta (brute-force search) de possíveis entradas para ver se elas produzem uma correspondência (match).
+
+hashlock::
+    Um hashlock é uma condição de gasto (spending condition) em Bitcoin Script que restringe o gasto de uma saída até que um determinado dado seja revelado. Os hashlocks possuem a propriedade útil de que, uma vez que qualquer hashlock seja revelado por meio de um gasto, quaisquer outros hashlocks protegidos usando a mesma chave também podem ser gastos. Isso torna possível criar várias saídas que estão todas condicionadas pelo mesmo hashlock e que se tornam todas gastáveis ao mesmo tempo.
+
+hash time-locked contract (HTLC)::
+    Um contrato de tempo fechado por hash (HTLC - Hash Time-Locked Contract) é um Bitcoin Script que consiste em hashlocks (travas de hash) e timelocks (travas de tempo) para exigir que o destinatário de um pagamento gaste o pagamento antes de um prazo, apresentando a pré-imagem do hash, ou o remetente pode reivindicar um reembolso após a expiração do timelock.
+    Na Lightning Network, os HTLCs são saídas na transação de compromisso (commitment transaction) de um canal de pagamento e são usados para possibilitar o roteamento de pagamentos sem confiança.
+
+invoice::
+    O processo de pagamento na Lightning Network é iniciado pelo destinatário (recebedor), que emite uma fatura, também conhecida como solicitação de pagamento (invoice), ou _payment request_.
+    As faturas incluem o hash do pagamento, o valor, uma descrição e o tempo de expiração. As faturas da Lightning Network são definidas no BOLT #11.
+    As faturas também podem incluir um endereço Bitcoin de fallback para o qual o pagamento pode ser feito caso não seja possível encontrar uma rota, bem como dicas para o roteamento de um pagamento por meio de um canal privado.
+
+just-in-time (JIT) routing::
+    O roteamento Just-in-time (JIT) é uma alternativa ao roteamento baseado na origem que foi pass:[ <span class="keep-together">proposto</span> ] pela primeira vez pelo coautor René Pickhardt.
+    Com o roteamento just-in-time (JIT), os nós intermediários ao longo de um caminho podem pausar um pagamento em andamento (in-flight payment) para reequilibrar seus canais antes de prosseguir com o pagamento.
+    Isso pode permitir que eles encaminhem com sucesso pagamentos que, de outra forma, poderiam ter falhado devido à falta de capacidade de saída.
+
+Lightning message::
+    Uma mensagem da Lightning Network é uma sequência de dados criptografados que pode ser enviada entre dois pares na Lightning Network. Semelhante a outros protocolos de comunicação, as mensagens da Lightning consistem em um cabeçalho e um corpo. O cabeçalho e o corpo possuem seus próprios HMAC (Hash-based Message Authentication Code). As mensagens da Lightning são o principal componente da camada de mensagens.
+
+Lightning Network, Lightning Network Protocol, pass:[<span class="keep-together">Lightning Protocol</span>]::
+    A Lightning Network, ou Rede Relâmpago, é um protocolo em cima do Bitcoin (ou outras criptomoedas).
+    Ele cria uma rede de canais de pagamento que permite o encaminhamento confiável de pagamentos através da rede com a ajuda de HTLCs (Hashed Time-Locked Contract) e roteamento de cebola.
+    Outros componentes da Lightning Network são o protocolo de divulgação (gossipprotocol), a camada de transporte e as solicitações de pagamento.
+
+Lightning Network protocol suite::
+    O conjunto de protocolos Lightning Network consiste em cinco camadas responsáveis por várias partes do protocolo.
+    Da camada inferior (primeira camada) até a camada superior (quinta camada), essas camadas são chamadas de camada de comunicação de rede (network communication layer), camada de mensagens (messaging layer), camada peer-to-peer (peer-to-peer layer), camada de roteamento (routing layer) e camada de pagamento (payment layer).
+    Vários BOLTs definem partes de uma ou várias camadas.
+
+Lightning Network node, Lightning node::
+    Um computador que participa da Lightning Network, por meio do protocolo ponto a ponto Lightning.
+    Os nós do Lightning têm a capacidade de abrir canais com outros nós, enviar e receber pagamentos e encaminhar pagamentos de outros usuários.
+    Normalmente, um usuário de nó Lightning também executará um nó Bitcoin.
+
+lnd::
+    Implementação do protocolo LN pela empresa com sede em São Francisco https://lightning.engineering[Lightning Labs].
+    Está escrito em Go. O código-fonte está em https://github.com/lightningnetwork/lnd[GitHub].
+
+local features (field: +localfeatures+)::
+    As características locais de um nó da Lightning Network são as características configuráveis de interesse direto para seus pares.
+    Eles são anunciados na mensagem `init` do protocolo peer, bem como nas mensagens `channel_announcement` e `node_announcement` do protocolo gossip (protocolo de divulgação).
+
+locktime::
+    Locktime, ou mais tecnicamente nLockTime, é a parte de uma transação de Bitcoin que indica o horário mais cedo ou o bloco mais cedo em que essa transação pode ser adicionada à blockchain.
+
+messaging layer::
+    A camada de mensagens é construída em cima da camada de conexão de rede do conjunto de protocolos da Lightning Network.
+    A camada de mensagens é responsável por garantir uma comunicação criptografada e segura, bem como a troca de informações por meio do protocolo da camada de conexão de rede escolhido.
+    A camada de mensagens define o formato e a estrutura das Mensagens da Lightning Network, conforme definido no BOLT #1.
+    Os bits de recurso (feature bits) definidos no BOLT #9 também fazem parte desta camada.
+
+
+millisatoshi::
+    A menor unidade de conta na Lightning Network. Um millisatoshi é um centésimo de bilionésimo de um único bitcoin. Um millisatoshi é um milésimo de um satoshi. Os millisatoshis não existem nem podem ser liquidados na rede Bitcoin.
+
+multipart payments (MPP)::
+	Os pagamentos multipartes (MPP), frequentemente também chamados de pagamentos multipath, são um método para dividir o valor do pagamento em várias partes menores e entregá-las ao longo de um ou mais caminhos. Como o MPP pode enviar muitas ou todas as partes por um único caminho, o termo pagamento multipartes é mais preciso do que pagamento multipath. Na ciência da computação, os pagamentos multipartes são modelados como fluxos de rede.
+
+multisignature::
+    Multisignature (multisig) refere-se a um script que requer mais de uma assinatura para autorizar gastos.
+    Os canais de pagamento são sempre codificados como endereços multisig que exigem uma assinatura de cada parceiro do canal de pagamento.
+    No caso padrão de um canal de pagamento de duas partes, um endereço multisig 2 de 2 (2-of-2) é usado.
+
+node::
+    See _Lightning Network node_.
+
+network capacity::
+    A capacidade do LN é a quantidade total de bitcoin bloqueado e circulado dentro da Lightning Network.
+    É a soma das capacidades de cada canal público.
+    Isso reflete o uso da Lightning Network até certo ponto, porque esperamos que as pessoas coloquem bitcoin nos canais Lightning para gastá-lo ou encaminhar pagamentos de outros usuários.
+    Portanto, quanto maior a quantidade de bitcoin nos canais Lightning, maior o uso esperado da Lightning Network.
+    Observe que, como apenas a capacidade pública do canal pode ser observada, a capacidade real da rede é desconhecida. Além disso, como a capacidade de um canal pode permitir um número ilimitado de pagamentos de ida e volta, a capacidade da rede não implica um limite no valor transferido na Lightning Network.
+
+network connection layer::
+    A camada mais baixa do conjunto de protocolos Lightning Network.
+    Sua responsabilidade é suportar protocolos de internet como IPv4, IPv6, TOR2 e TOR3, e utilizá-los para estabelecer um canal de comunicação criptográfico seguro, conforme definido no BOLT #8, ou para utilizar o protocolo DNS para a inicialização da rede, conforme definido no BOLT #10.
+
+Noise_XK::
+    O modelo do Framework de Protocolo de Ruído (Noise Protocol Framework) é usado para estabelecer um canal de comunicação autenticado e criptografado entre dois pares da Lightning Network.
+    X significa que nenhuma chave pública precisa ser conhecida do iniciador da conexão.
+    K significa que a chave pública do receptor precisa ser conhecida.
+
+onion routing::
+    O roteamento Onion (roteamento de cebola) é uma técnica para comunicação anônima em uma rede de computadores.
+    Em uma rede cebola, as mensagens são encapsuladas em camadas de criptografia, análogas às camadas de uma cebola.
+    Os dados criptografados são transmitidos por uma série de nós de rede chamados roteadores de cebola, cada um dos quais remove uma única camada, revelando o próximo destino dos dados.
+    Quando a camada final é descriptografada, a mensagem chega ao seu destino.
+    O remetente permanece anônimo porque cada intermediário conhece apenas a localização dos nós imediatamente anteriores e posteriores.
+
+output::
+    A saída de uma transação Bitcoin, também chamada de saída de transação não gasta (UTXO—Unspent Transaction Output).
+    Uma saída é uma quantidade indivisível de bitcoin que pode ser gasta, bem como um script que define quais condições precisam ser atendidas para que esse bitcoin seja gasto.
+    Toda transação bitcoin consome algumas saídas de transações registradas anteriormente e cria novas saídas que podem ser gastas posteriormente por transações subsequentes.
+    Uma saída típica de bitcoin exigirá que uma assinatura seja gasta, mas as saídas podem exigir o cumprimento de scripts mais complexos.
+    Por exemplo, um script de múltiplas assinaturas (multisignature) requer que dois ou mais detentores de chaves assinem antes que a saída possa ser gasta. Esse é um componente fundamental da Lightning Network.
+
+Pay-to-Public-Key-Hash (P2PKH)::
+    P2PKH (Pay-to-Public-Key-Hash) é um tipo de saída que vincula bitcoin ao hash de uma chave pública. Uma saída bloqueada por um script P2PKH pode ser desbloqueada (gasta) apresentando a chave pública correspondente ao hash e uma assinatura digital criada pela chave privada correspondente.
+
+Pay-to-Script-Hash (P2SH)::
+    P2SH (Pay-to-Script-Hash) é um tipo versátil de saída que permite o uso de Scripts Bitcoin complexos. Com P2SH, o script complexo que detalha as condições para gastar a saída (redeem script) não é apresentado no locking script. Em vez disso, o valor é bloqueado para o hash de um script, que deve ser apresentado e cumprido para gastar a saída. 
+
+P2SH address::
+    Os endereços P2SH são codificações Base58Check do hash de 20 bytes de um script. Os endereços P2SH começam com um "3". Os endereços P2SH ocultam toda a complexidade, de modo que o remetente de um pagamento não vê o script.
+
+Pay-to-Witness-Public-Key-Hash (P2WPKH)::
+	P2WPKH é o equivalente SegWit de P2PKH, usando uma testemunha segregada (segregated witness). A assinatura para gastar uma saída P2WPKH é colocada na árvore testemunha em vez do campo ScriptSig. Veja _SegWit_.
+
+P2WPKH address::
+	O formato de endereço &quot;nativo SegWit v0&quot;, os endereços P2WPKH são codificados em bech32 e começam com &quot;bc1q&quot;.
+
+Pay-to-Witness-Script-Hash (P2WSH)::
+    P2WSH é o equivalente SegWit de P2SH, usando uma testemunha segregada. A assinatura e o script para gastar uma saída P2WSH são colocados na árvore testemunha em vez do campo ScriptSig. Veja _SegWit_.
+
+P2WSH address::
+	O formato de endereço de script &quot;nativo Segwi v0&quot;, os endereços P2WSH são codificados em bech32 e começam com &quot;bc1q&quot;.
+
+Pay-to-Taproot (P2TR)::
+	Com ativação em novembro de 2021, o Taproot é um novo tipo de saída que bloqueia o bitcoin em uma árvore de condições de gastos ou em uma única condição de raiz.
+
+P2TR address::
+	O formato de endereço Taproot, representando SegWit v1, é um endereço codificado em bech32m e começa com &quot;bc1p&quot;.
+
+payment::
+    Um pagamento Lightning ocorre quando o bitcoin é transferido dentro da Lightning Network. Os pagamentos geralmente não são vistos na blockchain do Bitcoin.
+
+
+payment channel::
+    Um canal de pagamento é uma relação financeira entre dois nós na Lightning Network, criada usando uma transação bitcoin pagando um endereço de assinatura múltipla.
+    Os parceiros de canal podem usar o canal para enviar bitcoins de um para o outro sem precisar registrar todas as transações na blockchain do Bitcoin. 
+    Em um canal de pagamento típico, apenas duas transações são adicionadas à blockchain: a transação de financiamento (funding transaction) e a transação de compromisso (commitment transaction).
+    Os pagamentos enviados pelo canal não são registrados no blockchain e ocorrem &quot;fora da cadeia&quot; (off-chain).
+
+payment layer::
+    A camada superior e a quinta do conjunto de protocolos Lightning Network operam sobre a camada de roteamento.
+    Sua responsabilidade é viabilizar o processo de pagamento via BOLT #11.
+    Embora faça amplo uso do gráfico de canais obtido pelo protocolo de divulgação (gossip protocol), conforme definido no BOLT #7, as estratégias reais para encaminhar um pagamento não fazem parte da especificação do protocolo e são deixadas a cargo das implementações.
+    Como este tema é muito importante para garantir a confiabilidade do processo de entrega de pagamentos, nós o incluímos neste livro.
+
+peer::
+    Os participantes em uma rede peer-to-peer. Na Lightning Network, os pares se conectam uns aos outros por meio de comunicação criptografada e autenticada por meio de um soquete TCP, seja por IP ou através do Tor.
+
+peer-to-peer layer::
+    A camada ponto a ponto (peer-to-peer) é a terceira camada do conjunto de protocolos Lightning Network e funciona sobre a camada de mensagens.
+    Ele é responsável por definir a sintaxe e a semântica das informações trocadas entre os pares por meio de mensagens da rede Lightning.
+    Isso consiste em mensagens de controle conforme definidas no BOLT #9; mensagens de estabelecimento de canal, operação e encerramento do canal conforme definidas no BOLT #2; bem como mensagens de divulgação e roteamento conforme definidas no BOLT #7.
+
+private channel::
+    Um canal não anunciado para o resto da rede.
+    Tecnicamente, "privado" é um termo inadequado porque esses canais ainda podem ser identificados por meio de pistas de roteamento e transações de compromisso.
+Eles são melhor descritos como canais "não-anunciados".
+	Com um canal não anunciado, os parceiros de canal podem enviar e receber pagamentos entre si normalmente.
+    No entanto, o restante da rede não estará ciente do canal e, portanto, não poderá usá-lo para rotear pagamentos.
+    Como o número e a capacidade de canais não anunciados são desconhecidos, a contagem e a capacidade total de canais públicos representam apenas uma parte do total da Lightning Network.
+
+preimage::
+	No contexto da criptografia e especificamente na Lightning Network, o termo "preimage" se refere à entrada de uma função hash que produz uma hash específica. Não é viável calcular o preimage a partir da hash (as funções hash são unidirecionais). Ao selecionar um valor aleatório secreto como preimage e calcular sua hash, podemos nos comprometer com esse preimage e revelá-lo posteriormente. Qualquer pessoa pode confirmar se o preimage revelado produz corretamente a hash correspondente.
+
+Proof of Work (PoW)::
+    Dados que exigem computação significativa para serem encontrados e podem ser facilmente verificados por qualquer pessoa para provar a quantidade de trabalho necessária para produzi-los.
+    No Bitcoin, os mineradores devem encontrar uma solução numérica para o algoritmo SHA-256 que atenda a uma meta de toda a rede, chamada de meta de dificuldade.
+Consulte _Mineração de Bitcoin_ para obter mais informações.
+
+Point Time-Locked Contract (PTLC)::
+    Um Point Time-Locked Contract (PTLC) é um script Bitcoin que permite um gasto condicional na apresentação de um segredo ou após a passagem de um determinado blockheight (altura de bloco), semelhante a um HTLC. Ao contrário dos HTLCs, os PTLCs não dependem de uma pré-imagem de uma função hash, mas sim da chave privada de um ponto de curva elíptica. A suposição de segurança é, portanto, baseada no logaritmo discreto. Os PTLCs ainda não estão implementados na Lightning Network.
+
+relative timelock::
+    Um bloqueio temporal relativo é um tipo de bloqueio temporal que permite que uma entrada especifique o tempo mais anterior em que a entrada pode ser adicionada a um bloco. O tempo é relativo e baseia-se no momento em que a saída referenciada por essa entrada foi registrada em um bloco. Os bloqueios temporais relativos são definidos pelo campo de transação +nSequence+ e pelo opcode +CHECKSEQUENCEVERIFY+ (CSV) do Bitcoin Script, que foi introduzido pelo BIP-68/112/113.
+
+Revocable Sequence Maturity Contract (RSMC)::
+    Este contrato é usado para construir um canal de pagamento entre dois usuários de Bitcoin ou LN que não precisam confiar um no outro.
+    O nome vem de uma sequência de estados que são codificados como transações de compromisso e podem ser revogados se publicados e minerados indevidamente pela rede Bitcoin.
+
+revocation key::
+    Cada RSMC (Recoverable Sequence Maturity Contract) contém duas chaves de revogação. Cada parceiro do canal conhece uma chave de revogação. Ao conhecer ambas as chaves de revogação, a saída do RSMC pode ser gasta dentro do prazo definido. Durante a negociação de um novo estado do canal, as chaves de revogação antigas são compartilhadas, revogando assim o estado antigo. As chaves de revogação são usadas para desencorajar os parceiros do canal de transmitir um estado antigo do canal.
+
+RIPEMD-160::
+    RIPEMD-160 é uma função hash criptográfica que produz um hash de 160 bits (20 bytes).
+
+routing layer::
+    A quarta camada do conjunto de protocolos Lightning Network opera sobre a camada ponto a ponto (peer-to-peer).
+    Sua responsabilidade é definir as primitivas criptográficas e o protocolo de comunicação necessário para permitir o transporte seguro e atômico de bitcoins de um nó remetente para um nó destinatário
+    Enquanto o BOLT #4 define o formato da cebola (onion) que é usado para comunicar informações de transporte para participantes remotos com os quais não existem conexões diretas, o transporte real das cebolas e as primitivas criptográficas são definidos no BOLT #2.
+
+topology::
+    A topologia da Lightning Network descreve a forma da Lightning Network como um grafo matemático. Os nós do grafo são os nós da Lightning (participantes/receptores da rede). As bordas do grafo são os canais de pagamento.
+    A topologia da Lightning Network é transmitida publicamente com a ajuda do protocolo gossip, com exceção dos canais não anunciados.
+    Isso significa que a Lightning Network pode ser significativamente maior do que o número anunciado de canais e nós.
+    Conhecer a topologia é de particular interesse no processo de roteamento baseado em origem de pagamentos, no qual o remetente descobre uma rota.
+
+satoshi::
+    Um satoshi é a menor unidade (denominação) de bitcoin que pode ser registrada na blockchain. Um satoshi equivale a 1/100 milionésimo (0,00000001) de um bitcoin e recebe o nome do criador do Bitcoin, Satoshi Nakamoto.
+
+Satoshi Nakamoto::
+    Satoshi Nakamoto é o nome utilizado pela pessoa ou grupo de pessoas que projetaram o Bitcoin e criaram sua implementação de referência original. Como parte da implementação, eles também conceberam o primeiro banco de dados blockchain. No processo, eles foram os primeiros a resolver o problema de gasto duplo para moedas digitais. Sua verdadeira identidade permanece desconhecida.
+
+Schnorr signature::
+    Um novo esquema de assinatura digital que será ativado no Bitcoin em novembro de 2021. Ele permite inovações na Lightning Network, como PTLCs (Payment Tokenized Lightning Network Contract) eficientes—uma melhoria nos HTLCs (Hashed Time Lock Contracts).
+
+script, Bitcoin Script::
+    Bitcoin usa um sistema de script para transações chamado Bitcoin Script. Assemelhando-se à linguagem de programação Forth, é simples, baseado em pilha (stack-based) e processado da esquerda para a direita. É intencionalmente Turing-incompleto, sem loops ou recursão.
+
+ScriptPubKey (aka pubkey script)::
+    ScriptPubKey ou script pubkey, é um script incluído nas saídas que define as condições que devem ser cumpridas para que essas saídas sejam gastas. Os dados para cumprir as condições podem ser fornecidos em um script de assinatura. Consulte também _ScriptSig_.
+
+ScriptSig (aka signature script)::
+    ScriptSig ou script de assinatura são os dados gerados por um gastador, que quase sempre são usados como variáveis para satisfazer um pubkey script.
+
+secret key  (chave privada)::
+    O número secreto que desbloqueia bitcoin enviado para o endereço correspondente. Uma chave pass:[<span class="keep-together">privada</span>] se parece com isso: +5J76sF8L5j&#x200b;TtzE96r66Sf8cka9y44wdpJjMwCxR3tzLh3i&#x200b;bVPxh+.
+
+Segregated Witness (SegWit)::
+    Segregated Witness (SegWit) é uma atualização do protocolo do Bitcoin introduzida em 2017 que adiciona uma nova testemunha para assinaturas e outras provas de autorização de transações. Este novo campo de testemunha é isento do cálculo do ID da transação, o que resolve a maioria das classes de maleabilidade de transações por terceiros (transaction malleability). O Segregated Witness foi implementado como um soft fork e é uma mudança que torna tecnicamente as regras do protocolo do Bitcoin mais restritivas.
+
+Secure Hash Algorithm (SHA)::
+    O Secure Hash Algorithm (SHA) é uma família de funções criptográficas de hash publicadas pelo National Institute of Standards and Technology (NIST). O protocolo do Bitcoin atualmente utiliza o SHA-256, que produz um hash de 256 bits.
+
+short channel ID (scid)::
+    Uma vez que um canal é estabelecido, o índice da transação de financiamento na blockchain é utilizado como o ID de canal curto para identificar de forma única o canal.
+    O ID de canal curto consiste em oito bytes referentes a três números.
+    Em sua forma serializada, esses três números são representados como valores decimais separados pela letra "x" (por exemplo, +600123x01x00+).
+    O primeiro número (4 bytes) é a altura do bloco.
+    O segundo número (2 bytes) é o índice da transação de financiamento com os blocos.
+    O último número (2 bytes) é a saída da transação.
+
+verificação simplificada de pagamento (SPV)::
+    SPV (Simplified Payment Verification) é um método para verificar se determinadas transações foram incluídas em um bloco sem fazer o download o bloco inteiro. Esse método é utilizado por algumas carteiras leves de Bitcoin e Lightning.
+
+source-based routing::
+    Na Lightning Network, o emissor de um pagamento decide a rota do pagamento.
+    Embora isso diminua a taxa de sucesso do processo de roteamento, aumenta a privacidade dos pagamentos.
+    Devido ao SPHINX Mix Format usado pelo roteamento de cebola, todos os nós de roteamento não conhecem o originador de um pagamento ou o destinatário final.
+    O roteamento baseado na fonte (source-based routing) é fundamentalmente diferente de como o roteamento funciona no Protocolo de Internet.
+
+soft fork::
+    Soft fork, ou alteração de soft fork, é uma atualização de protocolo que é compatível com versões anteriores e posteriores, permitindo que nós antigos e novos continuem usando a mesma cadeia de blocos.
+
+SPHINX Mix Format::
+    Uma técnica específica para roteamento de cebola usada na Lightning Network e inventada por https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf[George Danezis e Ian Goldberg em 2009].
+    Com o SPHINX Mix Format, cada mensagem do pacote onion é preenchida com alguns dados aleatórios para que nenhum único salto (hop) possa estimar a distância percorrida ao longo da rota.
+    Embora a privacidade do emissor e do destinatário do pagamento seja protegida, cada nó ainda pode retornar uma mensagem de erro ao longo do caminho para o originador da mensagem.
+
+submarine swap::
+    Um submarine swap é uma troca atômica sem confiança entre endereços Bitcoin na cadeia (on-chain) e pagamentos na rede Lightning Network fora da cadeia (off-chain). Assim como os pagamentos na Lightning Network usam HTLCs (Hashed Time Lock Contracts) que condicionam a reivindicação final dos fundos à revelação de um segredo (preimagem de hash), os submarine swaps utilizam o mesmo mecanismo para transferir fundos através da barreira entre on-chain e off-chain com confiança mínima. Os reverse submarine swaps permitem trocas na direção oposta, de um pagamento off-chain na Lightning Network para um endereço Bitcoin na cadeia (on-chain).
+
+timelock::
+    Um timelock é um tipo de restrição que impede o gasto de alguns bitcoins até um momento futuro ou altura de bloco especificados. Timelocks são amplamente utilizados em muitos contratos do Bitcoin, incluindo canais de pagamento e HTLCs (Hashed Time Lock Contracts).
+
+transação::
+    Transações são estruturas de dados usadas pelo Bitcoin para transferir bitcoin de um endereço para outro.
+    Vários milhares de transações são agregadas em um bloco, que é então registrado (minerado) na blockchain.
+    A primeira transação em cada bloco, chamada de transação coinbase, gera um novos bitcoin.
+
+transaction malleability::
+    A maleabilidade da transação é uma propriedade na qual o hash de uma transação pode mudar sem alterar a semântica da transação.
+    Por exemplo, alterar a assinatura pode alterar o hash de uma transação.
+    Uma transação de compromisso (commitment transaction) precisa do hash de uma transação de financiamento (funding transaction), e se o hash da transação de financiamento for alterado, as transações que dependem dela se tornarão inválidas. Isso fará com que os usuários não consigam reivindicar reembolsos, caso existam.
+    O soft fork do Segregated Witness (SegWit) aborda essa questão e, portanto, foi uma atualização importante para suportar a Lightning Network.
+
+camada de transporte::
+    Em redes de computadores, a camada de transporte é uma divisão conceitual dos métodos usados pelos computadores (e, em última instância, pelas aplicações) para se comunicarem entre si.
+    A camada de transporte fornece serviços de comunicação entre computadores, como controle de fluxo, verificação e multiplexação (para permitir que várias aplicações funcionem em um computador ao mesmo tempo).
+
+unspent transaction output (UTXO)::
+  Consulte _output_.
+
+carteira::
+    Uma carteira (wallet) é um software que guarda as chaves privadas do Bitcoin. Ela é usada para criar e assinar transações do Bitcoin. No contexto da Lightning Network, ela também guarda segredos de revogação do estado antigo do canal e as últimas transações de compromisso pré-assinadas.
+
+watchtower::
+    Watchtowers são um serviço de segurança na Lightning Network que monitoram os canais de pagamento em busca de possíveis violações do protocolo.
+    Se um dos parceiros de canal ficar offline ou perder o backup, essa torre de vigilância mantém os backups e pode restaurar as informações do canal.
++
+Os watchtowers também monitoram a blockchain do Bitcoin e podem enviar uma transação de penalidade se um dos parceiros tentar "trapacear" ao transmitir um estado desatualizado. Os watchtowers podem ser operados pelos próprios parceiros do canal ou como um serviço pago oferecido por terceiros. Os watchtowers não têm controle sobre os fundos nos canais em si.
+
+Algumas definições de contribuição foram obtidas sob uma licença CC-BY de https://en.bitcoin.it/wiki/Main_Page[Bitcoin Wiki], https://en.wikipedia.org[Wikipedia], https://github.com/bitcoinbook/bitcoinbook[_Mastering Bitcoin_], ou de outras publicações de código aberto.

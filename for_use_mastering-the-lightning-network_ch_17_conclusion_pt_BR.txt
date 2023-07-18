@@ -1,0 +1,81 @@
+[[conclusion_chapter]]
+== Conclusão
+
+((("innovations in Lightning", id="ix_17_conclusion-asciidoc0", range="startofrange")))Em apenas alguns anos, a Lightning Network passou de um artigo técnico (whitepaper) para uma rede global em rápido crescimento. Como segunda camada do Bitcoin, ela cumpriu a promessa de pagamentos rápidos, baratos e privados. Além disso, ela desencadeou uma tsunami de inovação, permitindo que os desenvolvedores se libertem das restrições da marcha sincronizada, do consenso rígido que existe no desenvolvimento do Bitcoin.
+
+A inovação na Lightning Network está ocorrendo em diversos níveis:
+
+* No protocolo principal do Bitcoin, fornecendo uso e demanda para novos opcodes Bitcoin Script, algoritmos de assinatura e otimizações
+* No nível do protocolo Lightning, com novos recursos (features) implantados rapidamente em toda a rede
+* No nível do canal de pagamento, com novas construções e aprimoramentos de canal
+* Como recursos distintos de adesão opcional implantados de ponta a ponta por implementações independentes, remetentes e destinatários podem utilizá-los caso desejem
+* Com novos e empolgantes Aplicativos Lightning (LApps) construídos sobre os clientes e protocolos
+
+Vejamos como essas inovações estão mudando a Lightning agora e no futuro próximo.
+
+=== Inovação Descentralizada e Assíncrona
+
+((("innovations in Lightning","decentralized/asynchronous nature of")))A Lightning não está vinculada ao consenso rígido, como ocorre com o Bitcoin. Isso significa que diferentes clientes da Lightning podem implementar recursos diferentes e negociar suas interações (see <<feature_bits>>). Como resultado, a inovação na Lightning Network está ocorrendo em um ritmo muito mais rápido do que no Bitcoin.
+
+Não apenas a Lightning está avançando rapidamente, mas também está criando demanda por novos recursos no sistema Bitcoin. Muitas inovações recentes e planejadas no Bitcoin são motivadas e justificadas pelo seu uso na Lightning Network. De fato, a Lightning Network é frequentemente mencionada como um exemplo de caso de uso para muitos dos novos recursos.
+
+[[bitcoin_prot_17]]
+==== Inovações no Protocolo Bitcoin e Bitcoin Script
+
+((("Bitcoin (system)","innovations motivated by Lightning Network use cases")))((("Bitcoin script","innovations motivated by Lightning Network use cases")))((("innovations in Lightning","Bitcoin innovations motivated by Lightning Network use cases")))O sistema Bitcoin é, por necessidade, um sistema conservador que precisa preservar a compatibilidade com as regras de consenso para evitar bifurcações não planejadas na blockchain ou partições na rede P2P. Como resultado, novos recursos exigem muita coordenação e testes antes de serem implementados na rede principal (mainnet), o sistema em produção.
+
+Aqui estão algumas das inovações atuais ou propostas no Bitcoin que são motivadas pelos casos de uso na Lightning Network:
+
+Neutrino:: Um protocolo de cliente leve com recursos aprimorados de privacidade em relação ao protocolo SPV legado. O Neutrino é principalmente utilizado por clientes da Lightning para acessar a blockchain do Bitcoin.
+
+Assinaturas Schnorr:: Introduzidas como parte do soft fork _Taproot_, as assinaturas Schnorr permitirão contratos flexíveis de Ponto Bloqueado no Tempo (Point Time-Locked Contracts, PTLCs) para a construção de canais na Lightning. Isso pode, em particular, fazer uso de assinaturas revogáveis em vez de transações revogáveis.
+
+Taproot:: Também faz parte do soft fork de novembro de 2021 que introduz as assinaturas Schnorr. O Taproot permite que scripts complexos sejam visualizados como pagamentos de um único pagador e um único beneficiário, indistinguíveis do tipo mais comum de pagamento no Bitcoin. Isso permitirá que transações cooperativas (mútuas) de encerramento de canais da Lightning sejam indistinguíveis de pagamentos simples e aumentará a privacidade dos usuários da LN. 
+
+Input rebinding:: Religação de entrada, também conhecido pelos nomes SIGHAS_NOINPUT ou SIGHASH_ANYPREVOUT, essa atualização planejada na linguagem Bitcoin Script é motivada principalmente por contratos inteligentes avançados, como o protocolo de canal eltoo.
+
+Covenants:: Atualmente em estágios iniciais de pesquisa, os covenants permitem que transações criem saídas que restrinjam transações futuras que as gastam. Esse mecanismo poderia aumentar a segurança dos canais da Lightning, tornando possível impor listas de permissões de endereços nas transações de compromisso.
+
+==== Inovação no Protocolo Lightning
+
+((("innovations in Lightning","Lightning P2P protocol")))((("Lightning Network Protocol","innovations in")))O protocolo ponto a ponto (P2P) da Lightning é altamente extensível e passou por muitas mudanças desde sua criação. A regra "Está tudo bem em ser ímpar" usada nos feature bits (see <<feature_bits>>) garante que os nós possam negociar os recursos que suportam, possibilitando várias atualizações independentes do protocolo.
+
+==== Extensibilidade TLV
+
+((("innovations in Lightning","TLV extensibility")))((("Type-Length-Value (TLV) format","innovations in")))O mecanismo Type-Length-Value (Tipo-Comprimento-Valor)  (veja <<tlv>>) para a extensão do protocolo de mensagens é extremamente poderoso e já possibilitou a introdução de várias novas capacidades na Lightning, enquanto mantendo tanto a compatibilidade progressiva (forward) quanto retroativa (backward).
+Um exemplo proeminente, que está atualmente em desenvolvimento e faz uso disso, é o embaralhamento de caminhos (path blinding) e pagamentos de trampolim (trampoline payments). Isso permite que um destinatário se oculte do remetente, mas também permite que clientes móveis enviem pagamentos sem a necessidade de armazenar o grafo completo de canais em seus dispositivos, utilizando uma terceira parte à qual não precisam revelar o destinatário final.
+
+==== Construção do Canal de Pagamento
+
+((("innovations in Lightning","payment channel construction")))((("payment channel","innovations in construction")))Os canais de pagamento são uma abstração operada por dois parceiros de canal. Desde que ambos estejam dispostos a executar um novo código, eles podem implementar simultaneamente uma variedade de mecanismos de canal. Na verdade, pesquisas recentes sugerem que os canais podem até ser atualizados dinamicamente para um novo mecanismo, sem fechar o canal antigo e abrir um novo tipo de canal.
+
+eltoo:: Um mecanismo de canal proposto que utiliza o input-rebinding (religação de entrada) para simplificar significativamente a operação dos canais de pagamento e eliminar a necessidade do mecanismo de penalidade. Ele requer um novo tipo de assinatura Bitcoin antes de poder ser implementado.
+
+==== Recursos de Ponta a Ponta com Adesão Opcional.
+
+((("innovations in Lightning","opt-in end-to-end features")))Contratos de Ponto Bloqueado no Tempo (Point Time-Locked Contracts, PTLCs):: Uma abordagem diferente em relação aos HTLCs, os PTLCs podem aumentar a privacidade, reduzir as informações vazadas para os nós intermediários e operar de forma mais eficiente do que os canais baseados em HTLCs.
+
+Canais grandes:: Canais grandes ou _Wumbo_ foram introduzidos de forma dinâmica na rede sem exigir coordenação. Canais que suportam pagamentos grandes são anunciados como parte das mensagens de anúncio de canal e podem ser utilizados de forma opcional.
+
+Pagamentos multipartes (Multipart Payments, MPP):: O MPP também foi introduzido de forma opcional, mas, ainda melhor, exige apenas que o remetente e o destinatário de um pagamento usem o MPP. O restante da rede simplesmente roteia os HTLCs como se fossem pagamentos de uma única parte.
+
+Roteamento JIT (Just-In-Time): Um método opcional que pode ser usado pelos nós de roteamento para aumentar sua confiabilidade e proteger a si mesmos contra spam.
+
+Keysend:: Uma atualização introduzida independentemente por implementações de clientes da Lightning, que permite que o remetente envie dinheiro de forma "não solicitada" e assíncrona, sem a necessidade de uma fatura prévia.
+
+HODL invoicesfootnote:[A palavra HODL surgiu a partir de uma forma errada e empolgada de escrever a palavra HOLD, que foi gritada em um fórum para encorajar as pessoas a não venderem o bitcoin em pânico.]:: Pagamentos em que o último HTLC não é coletado, comprometendo o remetente com o pagamento, mas permitindo que o destinatário adie a coleta até que alguma outra condição seja satisfeita, ou cancele a fatura sem coleta. Isso também foi implementado independentemente por diferentes clientes da Lightning e pode ser usado de forma opcional.
+
+Serviços de mensagens roteadas em camadas de cebola:: O mecanismo de roteamento em camadas de cebola e o banco de dados de chaves públicas subjacente dos nós podem ser usados para enviar dados que não estão relacionados a pagamentos, como mensagens de texto ou postagens em fóruns. O uso da Lightning para possibilitar mensagens pagas como solução para posts de spam e ataques Sybil (spam) é outra inovação que foi implementada independentemente do protocolo central.
+
+Ofertas (Offers):: Atualmente proposto como BOLT #12, mas já implementado por alguns nós, esse é um protocolo de comunicação para solicitar faturas (recorrentes) de nós remotos por meio de mensagens em camadas de cebola (Onion messages).
+
+[[lapps]]
+=== Aplicativos Lightning (LApps)
+
+((("innovations in Lightning","Lightning Applications")))((("Lightning Applications (LApps)")))Embora ainda estejam em seus estágios iniciais, já estamos presenciando o surgimento de aplicativos interessantes na Lightning. Amplamente definidos como um aplicativo que utiliza o Protocolo Lightning ou um cliente Lightning como componente, os LApps (Lightning Applications) são a camada de aplicação da Lightning.
+Um exemplo proeminente é o LNURL, que fornece uma funcionalidade semelhante às ofertas do BOLT #12, mas apenas por meio de HTTP e endereços Lightning. Ele funciona em cima de offers (ofertas) para fornecer aos usuários um endereço no estilo de e-mail para o qual outras pessoas podem enviar fundos, enquanto o software nos bastidores solicita uma fatura ao endpoint LNURL do nó.
+Mais LApps estão sendo desenvolvidos para jogos simples, aplicativos de mensagens, microsserviços, APIs pagáveis, dispensadores pagos (por exemplo, bombas de combustível), sistemas de negociação de derivativos e muito mais.
+
+=== Preparar, Apontar, Já!
+
+O futuro parece promissor. A Lightning Network está levando o Bitcoin a novos mercados e aplicações inexplorados. Equipado com o conhecimento deste livro, você pode explorar essa nova fronteira ou até mesmo se juntar como um pioneiro e abrir um novo caminho.(((range="endofrange", startref="ix_17_conclusion-asciidoc0")))
